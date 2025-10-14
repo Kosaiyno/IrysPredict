@@ -1,0 +1,27 @@
+{
+  "name": "irys-predict-market",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --open"
+  },
+  "dependencies": {
+    "@irys/web-upload": "latest",
+    "@irys/web-upload-ethereum": "latest",
+    "@irys/web-upload-ethereum-ethers-v6": "latest",
+    "ethers": "^6.13.2",
+    "axios": "^1.7.4",
+    "chart.js": "^4.4.3"
+  },
+  "devDependencies": {
+    "vite": "^5.3.1",
+    "vite-plugin-node-polyfills": "^0.21.0",
+    "crypto-browserify": "^3.12.0",
+    "stream-browserify": "^3.0.0",
+    "os-browserify": "^0.3.0",
+    "path-browserify": "^1.0.1"
+  }
+}

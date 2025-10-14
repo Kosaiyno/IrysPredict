@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>IrysPredict — Prototype</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <h1 class="brand">IrysPredict</h1>
+      <div class="spacer"></div>
+
+      <!-- New: Dark mode toggle (pill) -->
+      <button id="themeToggle" class="pill" type="button" aria-pressed="false">Dark mode</button>
+
+      <!-- Points pill (topbar) -->
+      <button id="pointsInfoBtn" class="pill" type="button">How points work</button>
+
+      <button id="walletBtn" class="btn mint" type="button">Connect Wallet</button>
+    </header>
+
+    <!-- Intro -->
+    <section class="intro">
+      <h2>Welcome to IrysPredict</h2>
+      <p>
+        This is a simple, fast prediction game on the Irys data layer. Pick
+        whether an asset will go up or down and earn points if you’re right.
+        Rounds last <b>5 minutes</b>. To keep it fair, betting is only open
+        during the first <b>1 minute</b> of each round. After that, the round
+        plays out and you’ll see how your call did.
+      </p>
+      <div class="notice">
+        Round length: <b>5 minutes</b> · Betting closes after <b>1 minute</b> into each round
+      </div>
+    </section>
+
+    <!-- Tabs -->
+    <nav class="tabs">
+      <button class="tab active" data-tab="markets" type="button">Markets</button>
+      <button class="tab" data-tab="leaderboard" type="button">Leaderboard</button>
+    </nav>
+
+    <main>
+      <!-- Markets -->
+      <section id="markets" class="tabpane active">
+        <div class="cards">
+          <!-- BTC -->
+          <div class="card" data-asset="BTC">
+            <div class="card-head">
+              <div>
+                <h3>BTC · 5m</h3>
+                <small class="status live">Live · Ends in <span class="countdown">05:00</span></small>
+              </div>
+              <a class="link" href="#" target="_blank" rel="noreferrer">View on Irys ↗</a>
+            </div>
+            <div class="odds">
+              <div><b class="pct up">--%</b> UP</div>
+              <div><b class="pct down">--%</b> DOWN</div>
+            </div>
+            <div class="actions">
+              <button class="btn up betBtn" data-side="UP" type="button">UP</button>
+              <button class="btn down betBtn" data-side="DOWN" type="button">DOWN</button>
+            </div>
+          </div>
+
+          <!-- ETH -->
+          <div class="card" data-asset="ETH">
+            <div class="card-head">
+              <div>
+                <h3>ETH · 5m</h3>
+                <small class="status live">Live · Ends in <span class="countdown">05:00</span></small>
+              </div>
+              <a class="link" href="#" target="_blank" rel="noreferrer">View on Irys ↗</a>
+            </div>
+            <div class="odds">
+              <div><b class="pct up">--%</b> UP</div>
+              <div><b class="pct down">--%</b> DOWN</div>
+            </div>
+            <div class="actions">
+              <button class="btn up betBtn" data-side="UP" type="button">UP</button>
+              <button class="btn down betBtn" data-side="DOWN" type="button">DOWN</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Did You Know — Irys Facts (your preferred design) -->
+        <section id="dyk" class="dyk">
+          <div class="dyk-inner">
+            <div class="dyk-head">
+              <div>
+                <h3>Did you know?</h3>
+                <small class="muted">Quick bites about Irys · rotates every few seconds</small>
+              </div>
+              <div class="dyk-ctrl">
+                <button id="dykPrev" class="btn ghost" type="button" aria-label="Previous fact">‹</button>
+                <button id="dykNext" class="btn ghost" type="button" aria-label="Next fact">›</button>
+              </div>
+            </div>
+
+            <blockquote class="dyk-card">
+              <p id="dykText">—</p>
+              <a id="dykLink" class="dyk-link" href="#" target="_blank" rel="noreferrer">Learn more ↗</a>
+              <div class="dyk-dots" id="dykDots"></div>
+            </blockquote>
+          </div>
+        </section>
+      </section>
+
+      <!-- Leaderboard -->
+      <section id="leaderboard" class="tabpane">
+        <h2>
+          Leaderboard (rolling 7 days)
+          <a id="lbSnapshotLink" class="link" href="#" target="_blank" rel="noreferrer" style="display:none;margin-left:8px;">Latest snapshot ↗</a>
+        </h2>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>#</th><th>Wallet</th><th>Points</th><th>Wins</th><th>Losses</th>
+              <th>Streak</th><th>Best</th><th>Rounds</th><th>Accuracy</th>
+            </tr>
+          </thead>
+          <tbody id="lbBody">
+            <tr><td>—</td><td>—</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0%</td></tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+
+    <!-- Bet Modal -->
+    <dialog id="betModal" class="modal">
+      <form method="dialog" class="modal-box" id="betForm">
+        <h3>Place Prediction</h3>
+        <p class="muted">
+          Asset: <span id="assetSpan"></span> · Side: <span id="sideSpan"></span>
+          · Price now: <span id="priceAtSelection">$--</span>
+        </p>
+        <label class="label">Reason (optional, 140 chars):</label>
+        <textarea id="reason" maxlength="140" class="textarea" placeholder="Why? TA / News / Gut..."></textarea>
+        <div class="modal-actions">
+          <button class="btn ghost" value="cancel" type="button" id="cancelBtn">Cancel</button>
+          <button class="btn mint" id="confirmBtn" value="default" type="submit">Confirm Prediction</button>
+        </div>
+        <p class="muted small">Prototype.</p>
+      </form>
+    </dialog>
+
+    <!-- Round Start Modal -->
+    <dialog id="roundModal" class="modal">
+      <div class="modal-box round-start-box">
+        <h2>New Round</h2>
+        <p class="muted">You have 5 minutes per round. Bets close at 1:00.</p>
+        <p class="muted">Next round begins in <span id="roundCountdown">0:05</span>…</p>
+        <button id="startRoundBtn" class="btn mint" type="button">Start</button>
+      </div>
+    </dialog>
+
+    <!-- Points Rules Modal -->
+    <dialog id="pointsModal" class="modal">
+      <div class="modal-box">
+        <h3>How points work</h3>
+        <ul class="rules">
+          <li><b>+10</b> for every correct prediction (win)</li>
+          <li><b>−6</b> for a wrong prediction (loss)</li>
+          <li><b>Streak boost:</b> each win in a row adds <b>+2</b> for that win (capped at <b>+10</b>)</li>
+          <li><b>Daily activity:</b> first 10 rounds you play today give <b>+1</b> each (max <b>+10</b>)</li>
+          <li><b>Anti-spam tax:</b> after 20 rounds today, you only earn <b>50%</b> of normal points until tomorrow</li>
+          <li><b>One global streak:</b> any loss (on any asset) resets it</li>
+        </ul>
+        <div class="examples">
+          <p class="muted small"><b>Example:</b> 3 wins in a row = <code>10 + (10+2) + (10+4) = 36</code> points.</p>
+          <p class="muted small">A loss after that: <code>−6</code> and streak resets.</p>
+        </div>
+        <div class="modal-actions">
+          <button id="closePointsBtn" class="btn mint" type="button">Got it</button>
+        </div>
+      </div>
+    </dialog>
+
+    <footer class="foot"><span class="muted small">IrysPredict · Prototype</span></footer>
+
+    <script type="module" src="/src/app.js"></script>
+  </body>
+</html>
