@@ -1,41 +1,31 @@
 <!doctype html>
-<html lang="en" data-theme="light">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>IrysPredict — Prototype</title>
+    <title>IrysPredict </title>
+
+    <!-- Prevent dark-mode flash: set class before CSS loads -->
+    <script>
+      (function () {
+        try {
+          var pref = localStorage.getItem('theme_pref_v1') || 'light';
+          if (pref === 'dark') document.documentElement.classList.add('dark');
+        } catch (e) {}
+      })();
+    </script>
+
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
     <header class="topbar">
       <h1 class="brand">IrysPredict</h1>
       <div class="spacer"></div>
-
-      <!-- New: Dark mode toggle (pill) -->
-      <button id="themeToggle" class="pill" type="button" aria-pressed="false">Dark mode</button>
-
-      <!-- Points pill (topbar) -->
+      <button id="themeBtn" class="pill" type="button">Dark mode</button>
       <button id="pointsInfoBtn" class="pill" type="button">How points work</button>
-
       <button id="walletBtn" class="btn mint" type="button">Connect Wallet</button>
     </header>
 
-    <!-- Intro -->
-    <section class="intro">
-      <h2>Welcome to IrysPredict</h2>
-      <p>
-        This is a simple, fast prediction game on the Irys data layer. Pick
-        whether an asset will go up or down and earn points if you’re right.
-        Rounds last <b>5 minutes</b>. To keep it fair, betting is only open
-        during the first <b>1 minute</b> of each round. After that, the round
-        plays out and you’ll see how your call did.
-      </p>
-      <div class="notice">
-        Round length: <b>5 minutes</b> · Betting closes after <b>1 minute</b> into each round
-      </div>
-    </section>
-
-    <!-- Tabs -->
     <nav class="tabs">
       <button class="tab active" data-tab="markets" type="button">Markets</button>
       <button class="tab" data-tab="leaderboard" type="button">Leaderboard</button>
@@ -44,6 +34,17 @@
     <main>
       <!-- Markets -->
       <section id="markets" class="tabpane active">
+        <!-- Intro ONLY in Markets -->
+        <section id="intro" class="intro">
+          <h2>Welcome to IrysPredict</h2>
+          <p>
+            This is a simple, fast prediction game  built on the Irys datachain layer. Pick whether an asset will go up or down and earn points if you’re right. Rounds last 5 minutes. To keep it fair, betting is only open during the first 1 minute of each round. After that, the round plays out and you’ll see how your call did.
+          </p>
+          <div class="notice">
+            Round length: <b>5 minutes</b> · Betting closes after <b>1 minute</b>
+          </div>
+        </section>
+
         <div class="cards">
           <!-- BTC -->
           <div class="card" data-asset="BTC">
@@ -84,7 +85,7 @@
           </div>
         </div>
 
-        <!-- Did You Know — Irys Facts (your preferred design) -->
+        <!-- Did You Know -->
         <section id="dyk" class="dyk">
           <div class="dyk-inner">
             <div class="dyk-head">
@@ -107,24 +108,33 @@
         </section>
       </section>
 
-      <!-- Leaderboard -->
-      <section id="leaderboard" class="tabpane">
-        <h2>
-          Leaderboard (rolling 7 days)
-          <a id="lbSnapshotLink" class="link" href="#" target="_blank" rel="noreferrer" style="display:none;margin-left:8px;">Latest snapshot ↗</a>
-        </h2>
-        <table class="table">
-          <thead>
-            <tr>
-              <th>#</th><th>Wallet</th><th>Points</th><th>Wins</th><th>Losses</th>
-              <th>Streak</th><th>Best</th><th>Rounds</th><th>Accuracy</th>
-            </tr>
-          </thead>
-          <tbody id="lbBody">
-            <tr><td>—</td><td>—</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0%</td></tr>
-          </tbody>
-        </table>
-      </section>
+     <!-- Leaderboard (responsive table) -->
+<section id="leaderboard" class="tabpane">
+  <h2>Leaderboard (rolling 7 days)</h2>
+
+  <div class="table-wrap">
+    <table class="table table-lb" aria-label="Leaderboard">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Wallet</th>
+          <th>Points</th>
+          <th>Wins</th>
+          <th>Losses</th>
+          <th class="col-hide-sm">Streak</th>
+          <th class="col-hide-sm">Best</th>
+        </tr>
+      </thead>
+      <tbody id="lbBody">
+        <tr>
+          <td>—</td><td>—</td><td>0</td><td>0</td><td>0</td>
+          <td class="col-hide-sm">0</td><td class="col-hide-sm">0</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
     </main>
 
     <!-- Bet Modal -->

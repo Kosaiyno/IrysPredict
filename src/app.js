@@ -5,63 +5,79 @@ import { EthersV6Adapter } from "@irys/web-upload-ethereum-ethers-v6";
 import { ethers } from "ethers";
 
 // ====== Helpers ======
-const $ = (sel, root = document) => root.querySelector(sel);
+const $  = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 const short = (a) => (a ? a.slice(0, 6) + "..." + a.slice(-4) : "");
 const fmtUsd = (n, d = 2) =>
   typeof n === "number" ? `$${Number(n).toLocaleString(undefined, { maximumFractionDigits: d })}` : "$--";
 
 // ====== Keys for persistence ======
-const ROUND_STATE_KEY = "round_state_v1";   // {startTs, endTs, roundId}
-const OPEN_BETS_KEY   = "open_bets_v1";     // { [roundId]: Bet[] }
-const LAST_WALLET_KEY = "last_wallet_address_v1";
-const LB_KEY          = "lb_wallet_stats_v1"; // leaderboard
-const THEME_KEY       = "theme_pref_v1";
-const LB_SNAPSHOT_KEY = "lb_last_snapshot_receipt_v1"; // { id, ts }
+const ROUND_STATE_KEY   = "round_state_v1";     // {startTs, endTs, roundId}
+const OPEN_BETS_KEY     = "open_bets_v1";       // { [roundId]: Bet[] }
+const LAST_WALLET_KEY   = "last_wallet_address_v1";
+const LB_KEY            = "lb_wallet_stats_v1";  // local leaderboard
+const THEME_KEY         = "theme_pref_v1";
 
-// ====== DYK (conversational, your design) ======
+// Optional: URL to a global leaderboard JSON snapshot
+const LEADERBOARD_SNAPSHOT_URL = "";
+
+// ====== Theme (instant toggle, no refresh) ======
+const themeBtn = $("#themeBtn");
+function applyTheme(mode){
+  const root = document.documentElement;
+  const isDark = mode === "dark";
+  root.classList.toggle("dark", isDark);
+  if (themeBtn) themeBtn.textContent = isDark ? "Light mode" : "Dark mode";
+  localStorage.setItem(THEME_KEY, isDark ? "dark":"light");
+}
+applyTheme(localStorage.getItem(THEME_KEY) || "light");
+themeBtn?.addEventListener("click", ()=>{
+  const next = document.documentElement.classList.contains("dark") ? "light" : "dark";
+  applyTheme(next);
+});
+
+// ====== DYK ======
 const DYK_FACTS = [
-  { text: "Did you know you can upload small files on Irys completely free? Anything under 100 KiB doesn’t even need funding.", href: "https://docs.irys.xyz/build/d/sdk/upload/upload" },
-  { text: "Every time you upload on Irys, you get a digital receipt that proves your data exists forever on-chain.", href: "https://docs.irys.xyz/build/d/sdk/upload/upload" },
-  { text: "Once your data is uploaded, you can grab it using your transaction ID at gateway.irys.xyz/<id>.", href: "https://docs.irys.xyz/build/d/sdk/upload/upload" },
-  { text: "Irys is a programmable data layer — uploads can carry logic and tags.", href: "https://docs.irys.xyz/build/p/programmability/connecting-to-testnet" },
-  { text: "Tag uploads with key/value pairs to organize and filter later.", href: "https://docs.irys.xyz/build/d/sdk/upload/upload" },
-  { text: "Pay per upload or fund once and upload many times.", href: "https://docs.irys.xyz/build/d/sdk/payment/fund" },
+  { text: "Uploads under 100 KiB on Irys are free (no funding).", href: "https://docs.irys.xyz/build/d/sdk/upload/upload" },
+  { text: "Each upload gets a verifiable on-chain receipt.", href: "https://docs.irys.xyz/build/d/sdk/upload/upload" },
+  { text: "Fetch data anywhere via gateway.irys.xyz/<id>.", href: "https://docs.irys.xyz/build/d/sdk/upload/upload" },
+  { text: "Irys is programmable: tag data and query via RPC.", href: "https://docs.irys.xyz/build/p/programmability/connecting-to-testnet" },
+  { text: "Price API shows exact storage costs.", href: "https://docs.irys.xyz/build/p/apis/price-api" },
+  { text: "Use @irys/web-upload + Ethers directly in the browser.", href: "https://docs.irys.xyz/build/d/irys-in-the-browser" },
 ];
 
-const dykText = $("#dykText");
-const dykLink = $("#dykLink");
-const dykPrev = $("#dykPrev");
-const dykNext = $("#dykNext");
-const dykDots = $("#dykDots");
+const dykText = $("#dykText"), dykLink = $("#dykLink");
+const dykPrev = $("#dykPrev"), dykNext = $("#dykNext"), dykDots = $("#dykDots");
 const _facts = [...DYK_FACTS];
-for (let i = _facts.length - 1; i > 0; i--) { const j = Math.floor(Math.random()*(i+1)); [_facts[i], _facts[j]] = [_facts[j], _facts[i]]; }
+for (let i = _facts.length - 1; i > 0; i--) {
+  const j = Math.floor(Math.random() * (i + 1));
+  [_facts[i], _facts[j]] = [_facts[j], _facts[i]];
+}
 let dykIndex = 0, dykTimer = null;
-
-function renderDots() {
+function renderDots(){
   if (!dykDots) return;
   dykDots.innerHTML = "";
   const cap = Math.min(_facts.length, 8);
-  for (let i = 0; i < cap; i++) {
+  for (let i=0;i<cap;i++){
     const s = document.createElement("span");
     s.className = "dot" + (i === (dykIndex % cap) ? " active" : "");
     dykDots.appendChild(s);
   }
 }
-function renderDYK() {
-  if (!dykText || !dykLink || _facts.length === 0) return;
+function renderDYK(){
+  if (!dykText || !dykLink || _facts.length===0) return;
   const item = _facts[dykIndex % _facts.length];
   dykText.textContent = item.text;
   dykLink.href = item.href;
   renderDots();
 }
-function nextDYK(step = 1) { dykIndex = (dykIndex + step + _facts.length) % _facts.length; renderDYK(); restartDYKTimer(); }
-function restartDYKTimer() { if (dykTimer) clearInterval(dykTimer); dykTimer = setInterval(() => nextDYK(1), 9000); }
-dykPrev?.addEventListener("click", () => nextDYK(-1));
-dykNext?.addEventListener("click", () => nextDYK(1));
-if (dykText && dykLink) { renderDYK(); restartDYKTimer(); }
+function nextDYK(step=1){ dykIndex = (dykIndex+step+_facts.length)%_facts.length; renderDYK(); restartDYKTimer(); }
+function restartDYKTimer(){ if(dykTimer) clearInterval(dykTimer); dykTimer = setInterval(()=>nextDYK(1), 9000); }
+dykPrev?.addEventListener("click", ()=>nextDYK(-1));
+dykNext?.addEventListener("click", ()=>nextDYK(1));
+if (dykText && dykLink){ renderDYK(); restartDYKTimer(); }
 
-// ====== Wallet + Irys (fixed) ======
+// ====== Wallet + Irys ======
 let irys = null;
 let walletAddress = null;
 let providerRef = null;
@@ -74,20 +90,16 @@ async function ensureWallet() {
   }
   if (!providerRef) providerRef = new ethers.BrowserProvider(window.ethereum);
 
-  // Try silent check
   let accounts = [];
   try { accounts = await providerRef.send("eth_accounts", []); } catch {}
-
-  if (!accounts || accounts.length === 0) {
-    await providerRef.send("eth_requestAccounts", []);
-  }
+  if (!accounts || accounts.length === 0) await providerRef.send("eth_requestAccounts", []);
 
   signerRef = await providerRef.getSigner();
   walletAddress = await signerRef.getAddress();
   window.connectedWallet = walletAddress;
   localStorage.setItem(LAST_WALLET_KEY, walletAddress);
 
-  const walletBtn = document.getElementById("walletBtn");
+  const walletBtn = $("#walletBtn");
   if (walletBtn) walletBtn.textContent = short(walletAddress);
 
   return { provider: providerRef, signer: signerRef, address: walletAddress };
@@ -98,20 +110,13 @@ async function ensureIrys() {
   const { provider } = await ensureWallet();
   const IRYS_TESTNET_RPC = "https://testnet-rpc.irys.xyz/v1";
   irys = await WebUploader(WebEthereum).withAdapter(EthersV6Adapter(provider)).withRpc(IRYS_TESTNET_RPC);
+  try { console.log(`Irys connected from ${irys.address}`); } catch {}
   return irys;
 }
 
-// ====== Theme toggle (persisted) ======
-const themeToggle = $("#themeToggle");
-const rootEl = document.documentElement;
-function applyTheme(theme){ rootEl.setAttribute("data-theme", theme); localStorage.setItem(THEME_KEY, theme); themeToggle.setAttribute("aria-pressed", theme==="dark" ? "true":"false"); themeToggle.textContent = theme==="dark" ? "Light mode" : "Dark mode"; }
-const savedTheme = localStorage.getItem(THEME_KEY) || "light"; applyTheme(savedTheme);
-themeToggle?.addEventListener("click", ()=> applyTheme(rootEl.getAttribute("data-theme")==="dark" ? "light" : "dark") );
-
-// ====== Tabs ======
+// ====== Tabs (hide intro on Leaderboard) ======
 const walletBtn = $("#walletBtn");
-const tabs = $$(".tab");
-const panes = $$(".tabpane");
+const tabs = $$(".tab"), panes = $$(".tabpane"), intro = $("#intro");
 
 tabs.forEach((t)=>
   t.addEventListener("click", ()=>{
@@ -119,11 +124,12 @@ tabs.forEach((t)=>
     t.classList.add("active");
     const id = t.dataset.tab;
     panes.forEach((p)=>p.classList.toggle("active", p.id === id));
-    if(id === "leaderboard") renderLeaderboard();
+    if (intro) intro.style.display = (id === "leaderboard" ? "none" : "");
+    if (id === "leaderboard") renderLeaderboard();
   })
 );
 
-walletBtn.addEventListener("click", async ()=>{
+walletBtn?.addEventListener("click", async ()=>{
   try{
     await ensureWallet();
     renderLeaderboard();
@@ -131,13 +137,16 @@ walletBtn.addEventListener("click", async ()=>{
   }catch(e){ alert(e.message || "Wallet connection failed"); }
 });
 
-// ====== Round Engine (5m) with 1m bet lock + persistence ======
+// ====== Round Engine (5m) with 1m lock + persistence ======
 const roundDuration = 5 * 60 * 1000;
 const BET_LOCK_MS   = 60 * 1000;
+
 let roundEndTime = 0;
 let currentRoundId = 0;
 
-function loadRoundState(){ try { const obj = JSON.parse(localStorage.getItem(ROUND_STATE_KEY) || "null"); return obj && typeof obj==="object" ? obj : null; } catch { return null; } }
+function loadRoundState(){
+  try { return JSON.parse(localStorage.getItem(ROUND_STATE_KEY) || "null"); } catch { return null; }
+}
 function saveRoundState(state){ localStorage.setItem(ROUND_STATE_KEY, JSON.stringify(state)); }
 
 function initRoundFromStorageOrNew(){
@@ -145,7 +154,7 @@ function initRoundFromStorageOrNew(){
   const now = Date.now();
   if (saved && now < saved.endTs) {
     currentRoundId = saved.roundId;
-    roundEndTime = saved.endTs;
+    roundEndTime   = saved.endTs;
   } else {
     startNewRound(false);
   }
@@ -167,16 +176,18 @@ function showRoundModal(){
   startRoundBtn.onclick = ()=>{ clearInterval(interval); roundModal.close(); startNewRound(true); };
 }
 
-function startNewRound(_byModal){
+function startNewRound(){
   const startTs = Date.now();
   currentRoundId = Math.floor(startTs / roundDuration);
-  roundEndTime = startTs + roundDuration;
+  roundEndTime   = startTs + roundDuration;
   saveRoundState({ startTs, endTs: roundEndTime, roundId: currentRoundId });
+
   setBetButtonsEnabled(true);
+  renderMyOpenBetsForCurrentRound();
 }
 
 function endRound(){
-  resolveOpenBets();              // computes W/L, updates leaderboard, uploads snapshot
+  resolveOpenBets();
   clearOpenBetsForRound(currentRoundId);
   $$(".active-bet").forEach((row)=>row.remove());
   showRoundModal();
@@ -192,9 +203,13 @@ function updateCountdowns(){
   const now = Date.now();
   const remaining = Math.max(0, roundEndTime - now);
   const elapsed   = roundDuration - remaining;
+
   $$(".countdown").forEach((el)=> el.textContent = renderCountdown(remaining));
   $$(".active-bet .countdown").forEach((el)=> el.textContent = renderCountdown(remaining));
-  if (elapsed >= BET_LOCK_MS) setBetButtonsEnabled(false); else setBetButtonsEnabled(true);
+
+  if (elapsed >= BET_LOCK_MS) setBetButtonsEnabled(false);
+  else setBetButtonsEnabled(true);
+
   if (remaining <= 0) endRound();
 }
 setInterval(updateCountdowns, 1000);
@@ -213,18 +228,18 @@ function renderMyOpenBetsForCurrentRound(){
   if (!walletAddress) {
     walletAddress = last;
     window.connectedWallet = walletAddress;
-    const wb = $("#walletBtn"); if (wb) wb.textContent = short(walletAddress);
+    if (walletBtn) walletBtn.textContent = short(walletAddress);
   }
   const arr = loadOpenBetsForRound(currentRoundId).filter(b => b.wallet?.toLowerCase() === walletAddress.toLowerCase());
   $$(".active-bet").forEach(n => n.remove());
-  arr.forEach(b=> showBetBelow(b.asset, b.side, b.reason, b.priceUsd, b.receiptId));
+  arr.forEach(b=> showBetBelow(b.asset, b.side, b.reason, b.priceUsd));
   arr.forEach(b => {
     const card = document.querySelector(`[data-asset='${b.asset}']`);
     card?.querySelectorAll(".betBtn")?.forEach((btn)=> btn.disabled = true);
   });
 }
 
-// ====== Prices (CoinGecko simple/price) — quiet on errors ======
+// ====== Prices (CoinGecko) ======
 const STATIC_IDS = { BTC: "bitcoin", ETH: "ethereum" };
 const ID_CACHE_KEY = "cg_id_cache_v1";
 const idCache = JSON.parse(localStorage.getItem(ID_CACHE_KEY) || "{}");
@@ -249,10 +264,6 @@ function ensurePriceBadge(card){
   if(!badge){
     badge = document.createElement("span");
     badge.className = "price-badge";
-    badge.style.cssText = "display:inline-block;margin-left:8px;padding:2px 6px;border:1px solid var(--border);border-radius:6px;background:#fff;color:#111;font-size:12px;";
-    if (document.documentElement.getAttribute("data-theme")==="dark") {
-      badge.style.background = "#0f141c"; badge.style.color = "var(--text)";
-    }
     const h3 = card.querySelector("h3"); if(h3) h3.after(badge);
   }
   return badge;
@@ -260,14 +271,17 @@ function ensurePriceBadge(card){
 async function fetchPrices(){
   const cards = $$(".card");
   const symToId = {};
-  await Promise.all(cards.map(async (card)=>{ const sym = card.dataset.asset; symToId[sym] = await resolveCoinId(sym); }));
+  await Promise.all(cards.map(async (card)=>{
+    const sym = card.dataset.asset;
+    symToId[sym] = await resolveCoinId(sym);
+  }));
   const ids = Object.values(symToId).filter(Boolean);
   if(ids.length===0) return;
 
   const url = "https://api.coingecko.com/api/v3/simple/price?vs_currencies=usd&include_24hr_change=true&ids=" + [...new Set(ids)].join(",");
   try{
     const res = await fetch(url, { headers: { accept: "application/json" } });
-    if(!res.ok) return;
+    if(!res.ok) return; // handle rate-limit quietly
     const data = await res.json();
 
     cards.forEach((card)=>{
@@ -292,7 +306,7 @@ async function fetchPrices(){
 }
 fetchPrices(); setInterval(fetchPrices, 30000);
 
-// ====== Bet flow (persisted) with receipt link ======
+// ====== Bet flow (persisted) ======
 const betModal = $("#betModal");
 const betForm = $("#betForm");
 const assetSpan = $("#assetSpan");
@@ -306,26 +320,26 @@ $$(".betBtn").forEach((btn)=>
     const now = Date.now();
     const remaining = Math.max(0, roundEndTime - now);
     const elapsed   = (roundDuration - remaining);
-    if (elapsed >= BET_LOCK_MS){ alert("Betting is closed for this round. Please wait for the next round."); return; }
+    if (elapsed >= BET_LOCK_MS){
+      alert("Betting is closed for this round. Please wait for the next round.");
+      return;
+    }
     const card = e.currentTarget.closest(".card");
     const asset = card?.dataset.asset || "UNKNOWN";
     const side  = e.currentTarget.dataset.side;
     currentBet = { asset, side };
     assetSpan.textContent = asset;
     sideSpan.textContent  = side;
+
     const snap = latestPriceBySymbol[asset]?.price;
     priceAtSelectionSpan.textContent = typeof snap === "number" ? fmtUsd(snap, 4) : "$--";
+
     reasonInput.value = "";
     betModal.showModal();
   })
 );
 
 $("#cancelBtn")?.addEventListener("click", ()=> betModal.close());
-
-function extractReceiptId(receipt){
-  // handles different shapes safely
-  return receipt?.id || receipt?.data?.id || receipt?.receiptId || null;
-}
 
 betForm.addEventListener("submit", async (e)=>{
   e.preventDefault();
@@ -343,13 +357,17 @@ betForm.addEventListener("submit", async (e)=>{
     const now = Date.now();
     const remaining = Math.max(0, roundEndTime - now);
     const elapsed   = (roundDuration - remaining);
-    if (elapsed >= BET_LOCK_MS){ alert("Betting is closed for this round. Please wait for the next round."); betModal.close(); return; }
+    if (elapsed >= BET_LOCK_MS){
+      alert("Betting is closed for this round. Please wait for the next round.");
+      betModal.close(); return;
+    }
 
     const priceSnap = latestPriceBySymbol[asset]?.price ?? null;
 
     const card = document.querySelector(`[data-asset='${asset}']`);
     card?.querySelectorAll(".betBtn")?.forEach((b)=> b.disabled = true);
 
+    // Upload to Irys
     const uploader = await ensureIrys();
     const ts = Date.now();
     const payload = {
@@ -373,12 +391,19 @@ betForm.addEventListener("submit", async (e)=>{
       { name:"content-type", value:"application/json" },
     ];
     const receipt = await uploader.upload(JSON.stringify(payload), { tags });
-    const receiptId = extractReceiptId(receipt);
 
-    const bet = { wallet: walletAddress, asset, side, reason: reasonInput.value.trim(), roundId: currentRoundId, ts, priceUsd: priceSnap, receiptId };
+    // Persist open bet
+    const bet = {
+      wallet: walletAddress, asset, side,
+      reason: reasonInput.value.trim(), roundId: currentRoundId, ts,
+      priceUsd: priceSnap,
+      irysId: receipt?.id || null
+    };
     addOpenBet(bet);
 
-    showBetBelow(asset, side, reasonInput.value.trim(), priceSnap, receiptId);
+    // Show below card with a link to Irys if available
+    showBetBelow(asset, side, reasonInput.value.trim(), priceSnap, bet.irysId);
+
     betModal.close();
   }catch(err){
     alert(err?.message || "Bet upload failed");
@@ -387,7 +412,7 @@ betForm.addEventListener("submit", async (e)=>{
   }
 });
 
-function showBetBelow(asset, side, reason, priceUsd, receiptId){
+function showBetBelow(asset, side, reason, priceUsd, irysId){
   const card = document.querySelector(`[data-asset='${asset}']`);
   if(!card) return;
   const existing = card.querySelector(".active-bet");
@@ -396,18 +421,18 @@ function showBetBelow(asset, side, reason, priceUsd, receiptId){
   const div = document.createElement("div");
   div.className = "active-bet";
   const priceLine = typeof priceUsd === "number" ? ` · Locked at <b>${fmtUsd(priceUsd,4)}</b>` : "";
-  const receiptLink = receiptId ? `<br><a href="https://gateway.irys.xyz/${receiptId}" target="_blank" rel="noreferrer" class="link">View receipt ↗</a>` : "";
+  const linkLine  = irysId ? `<br><a class="link" href="https://gateway.irys.xyz/${irysId}" target="_blank" rel="noreferrer">View on Irys ↗</a>` : "";
   div.innerHTML = `
     <p>
-      <b>${side}</b>${priceLine}${receiptLink}<br>
+      <b>${side}</b>${priceLine}<br>
       ${reason ? `Reason: ${reason}<br>` : ""}
       <small>Time left: <span class="countdown">${renderCountdown(Math.max(0, roundEndTime - Date.now()))}</span></small>
+      ${linkLine}
     </p>`;
-  div.style.cssText = "margin-top:10px;padding:10px;border:1px dashed var(--border);border-radius:8px;background:var(--panel)";
   card.appendChild(div);
 }
 
-// ====== Leaderboard (persists) + optional snapshot upload ======
+// ====== Leaderboard (local) ======
 function loadAllStats(){ try{ return JSON.parse(localStorage.getItem(LB_KEY) || "{}"); }catch{ return {}; } }
 function saveAllStats(map){ localStorage.setItem(LB_KEY, JSON.stringify(map)); }
 function getStats(addr){
@@ -422,37 +447,7 @@ function putStats(addr,stats){ const all = loadAllStats(); all[addr]=stats; save
 function dailyMultiplier(dayCount){ if(dayCount<=20) return 1; const extra=dayCount-20; return Math.max(0.5, 1 - extra*0.05); }
 function applySmallDecay(stats){ const now=Date.now(); const elapsedMin=Math.max(0, now-(stats.lastDecayAt||now))/60000; if(elapsedMin>=5){ stats.points=Math.round(stats.points*0.995); stats.lastDecayAt=now; } }
 
-async function uploadLeaderboardSnapshotIfPossible(){
-  try{
-    if(!walletAddress) return; // needs a connected wallet
-    const uploader = await ensureIrys();
-
-    // Build snapshot
-    const all = loadAllStats();
-    const rows = Object.entries(all).map(([addr,s])=>{
-      const rounds=s.rounds||0; const acc=rounds?Math.round((s.wins/rounds)*100):0;
-      return { addr, points:s.points||0, wins:s.wins||0, losses:s.losses||0, streak:s.streak||0, best:s.bestStreak||0, rounds, acc };
-    }).sort((a,b)=> (b.points-a.points) || (b.best-a.best));
-
-    const snap = { type:"leaderboard-snapshot", roundId: currentRoundId, ts: Date.now(), rows };
-    const tags = [
-      { name:"app", value:"irys-predict-prototype" },
-      { name:"type", value:"leaderboard-snapshot" },
-      { name:"round-id", value:String(currentRoundId) },
-      { name:"content-type", value:"application/json" },
-    ];
-    const receipt = await uploader.upload(JSON.stringify(snap), { tags });
-    const id = receipt?.id || receipt?.data?.id;
-    if(id){
-      localStorage.setItem(LB_SNAPSHOT_KEY, JSON.stringify({ id, ts: Date.now() }));
-      const link = $("#lbSnapshotLink");
-      if(link){ link.href = `https://gateway.irys.xyz/${id}`; link.style.display="inline-block"; }
-    }
-  }catch{
-    // quietly ignore if free allowance not available or user didn't connect wallet
-  }
-}
-
+// Compute win/loss for open bets at round end
 function resolveOpenBets(){
   const arr = loadOpenBetsForRound(currentRoundId);
   if(!arr.length) return;
@@ -488,48 +483,76 @@ function resolveOpenBets(){
   });
 
   renderLeaderboard();
-  // try uploading a snapshot (optional)
-  uploadLeaderboardSnapshotIfPossible();
 }
 
-function renderLeaderboard(){
+async function renderLeaderboard(){
   const tbody = $("#lbBody");
   if(!tbody) return;
+
+  // Optional global snapshot: we’ll only render the fields we need
+  if (LEADERBOARD_SNAPSHOT_URL){
+    try{
+      const res = await fetch(LEADERBOARD_SNAPSHOT_URL, { cache: "no-store" });
+      if (res.ok){
+        const rows = await res.json(); // may include extra fields; we ignore them
+        if (Array.isArray(rows) && rows.length){
+          rows.sort((a,b)=> (b.points-a.points) || ((b.best||0)-(a.best||0)));
+          tbody.innerHTML = rows.map((r,i)=>`
+            <tr>
+              <td>${i+1}</td>
+              <td>${short(r.addr)}</td>
+              <td><b>${r.points ?? 0}</b></td>
+              <td>${r.wins ?? 0}</td>
+              <td>${r.losses ?? 0}</td>
+              <td class="col-hide-sm">${r.streak ?? 0}</td>
+              <td class="col-hide-sm">${r.best ?? 0}</td>
+            </tr>`).join("");
+          return;
+        }
+      }
+    }catch{}
+  }
+
+  // Local stats fallback (no rounds/accuracy)
   const all = loadAllStats();
-  const rows = Object.entries(all).map(([addr,s])=>{
-    const rounds=s.rounds||0; const acc=rounds?Math.round((s.wins/rounds)*100):0;
-    return { addr, points:s.points||0, wins:s.wins||0, losses:s.losses||0, streak:s.streak||0, best:s.bestStreak||0, rounds, acc };
-  }).sort((a,b)=> (b.points-a.points) || (b.best-a.best));
+  const rows = Object.entries(all).map(([addr,s])=>({
+    addr,
+    points: s.points||0,
+    wins:   s.wins||0,
+    losses: s.losses||0,
+    streak: s.streak||0,
+    best:   s.bestStreak||0
+  }));
+  rows.sort((a,b)=> (b.points-a.points) || (b.best-a.best));
 
   tbody.innerHTML = rows.length ? rows.map((r,i)=>`
     <tr>
-      <td>${i+1}</td><td>${short(r.addr)}</td><td><b>${r.points}</b></td>
-      <td>${r.wins}</td><td>${r.losses}</td><td>${r.streak}</td>
-      <td>${r.best}</td><td>${r.rounds}</td><td>${r.acc}%</td>
-    </tr>`).join("") :
-    `<tr><td>—</td><td>—</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0%</td></tr>`;
-
-  // Show last snapshot link if we have one
-  const meta = JSON.parse(localStorage.getItem(LB_SNAPSHOT_KEY) || "null");
-  const link = $("#lbSnapshotLink");
-  if(link && meta?.id){ link.href = `https://gateway.irys.xyz/${meta.id}`; link.style.display="inline-block"; }
+      <td>${i+1}</td>
+      <td>${short(r.addr)}</td>
+      <td><b>${r.points}</b></td>
+      <td>${r.wins}</td>
+      <td>${r.losses}</td>
+      <td class="col-hide-sm">${r.streak}</td>
+      <td class="col-hide-sm">${r.best}</td>
+    </tr>`).join("") : `
+    <tr>
+      <td>—</td><td>—</td><td>0</td><td>0</td><td>0</td>
+      <td class="col-hide-sm">0</td><td class="col-hide-sm">0</td>
+    </tr>`;
 }
+
 
 // ====== Boot ======
 const lastWallet = localStorage.getItem(LAST_WALLET_KEY);
 if (lastWallet && !walletAddress) {
   walletAddress = lastWallet;
   window.connectedWallet = walletAddress;
-  const wb = $("#walletBtn"); if (wb) wb.textContent = short(walletAddress);
+  if (walletBtn) walletBtn.textContent = short(walletAddress);
 }
 initRoundFromStorageOrNew();
 renderMyOpenBetsForCurrentRound();
 renderLeaderboard();
-setInterval(updateCountdowns, 1000);
 
-// Points modal wiring
-const pointsBtn = $("#pointsInfoBtn");
-const pointsModal = $("#pointsModal");
-const closePointsBtn = $("#closePointsBtn");
-if (pointsBtn && pointsModal) pointsBtn.addEventListener("click", () => pointsModal.showModal());
-if (closePointsBtn && pointsModal) closePointsBtn.addEventListener("click", () => pointsModal.close());
+// Points modal trigger
+$("#pointsInfoBtn")?.addEventListener("click", ()=> $("#pointsModal").showModal());
+$("#closePointsBtn")?.addEventListener("click", ()=> $("#pointsModal").close());
