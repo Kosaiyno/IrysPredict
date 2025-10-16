@@ -3,9 +3,9 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>IrysPredict </title>
+    <title>IrysPredict — Prototype</title>
 
-    <!-- Prevent dark-mode flash: set class before CSS loads -->
+    <!-- Prevent dark-mode flash -->
     <script>
       (function () {
         try {
@@ -38,12 +38,14 @@
         <section id="intro" class="intro">
           <h2>Welcome to IrysPredict</h2>
           <p>
-            This is a simple, fast prediction game  built on the Irys datachain layer. Pick whether an asset will go up or down and earn points if you’re right. Rounds last 5 minutes. To keep it fair, betting is only open during the first 1 minute of each round. After that, the round plays out and you’ll see how your call did.
+            This is a simple, fast prediction game built on Irys datachain. Pick whether an asset will go up or down and earn points if you’re right.
+            Rounds last <b>5 minutes</b>. To keep it fair, betting is only open during the first <b>1 minute</b> of each round. After that, the round plays out and you’ll see how your call did.
           </p>
           <div class="notice">
             Round length: <b>5 minutes</b> · Betting closes after <b>1 minute</b>
           </div>
         </section>
+
 
         <div class="cards">
           <!-- BTC -->
@@ -108,33 +110,32 @@
         </section>
       </section>
 
-     <!-- Leaderboard (responsive table) -->
-<section id="leaderboard" class="tabpane">
-  <h2>Leaderboard (rolling 7 days)</h2>
+      <!-- Leaderboard (global from Irys) -->
+      <section id="leaderboard" class="tabpane">
+        <h2>Leaderboard (rolling 7 days)</h2>
 
-  <div class="table-wrap">
-    <table class="table table-lb" aria-label="Leaderboard">
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Wallet</th>
-          <th>Points</th>
-          <th>Wins</th>
-          <th>Losses</th>
-          <th class="col-hide-sm">Streak</th>
-          <th class="col-hide-sm">Best</th>
-        </tr>
-      </thead>
-      <tbody id="lbBody">
-        <tr>
-          <td>—</td><td>—</td><td>0</td><td>0</td><td>0</td>
-          <td class="col-hide-sm">0</td><td class="col-hide-sm">0</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-</section>
-
+        <div class="table-wrap">
+          <table class="table table-lb" aria-label="Leaderboard">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Wallet</th>
+                <th>Points</th>
+                <th>Wins</th>
+                <th>Losses</th>
+                <th class="col-hide-sm">Streak</th>
+                <th class="col-hide-sm">Best</th>
+              </tr>
+            </thead>
+            <tbody id="lbBody">
+              <tr>
+                <td>—</td><td>—</td><td>0</td><td>0</td><td>0</td>
+                <td class="col-hide-sm">0</td><td class="col-hide-sm">0</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
     </main>
 
     <!-- Bet Modal -->
@@ -172,10 +173,10 @@
         <ul class="rules">
           <li><b>+10</b> for every correct prediction (win)</li>
           <li><b>−6</b> for a wrong prediction (loss)</li>
-          <li><b>Streak boost:</b> each win in a row adds <b>+2</b> for that win (capped at <b>+10</b>)</li>
+          <li><b>Streak boost:</b> each win in a row adds <b>+2</b> (capped at <b>+10</b>)</li>
           <li><b>Daily activity:</b> first 10 rounds you play today give <b>+1</b> each (max <b>+10</b>)</li>
-          <li><b>Anti-spam tax:</b> after 20 rounds today, you only earn <b>50%</b> of normal points until tomorrow</li>
-          <li><b>One global streak:</b> any loss (on any asset) resets it</li>
+          <li><b>Anti-spam tax:</b> after 20 rounds today, you only earn <b>50%</b> until tomorrow</li>
+          <li><b>One global streak:</b> any loss resets it</li>
         </ul>
         <div class="examples">
           <p class="muted small"><b>Example:</b> 3 wins in a row = <code>10 + (10+2) + (10+4) = 36</code> points.</p>
