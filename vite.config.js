@@ -1,3 +1,4 @@
+// vite.config.js
 import { defineConfig } from "vite";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
 
@@ -19,5 +20,11 @@ export default defineConfig({
       os: "os-browserify/browser",
       path: "path-browserify",
     },
+  },
+  build: {
+    // makes esbuild OK with modern syntax and avoids top-level-await issues
+    target: "esnext",
+    // optional, silences the big bundle warning
+    chunkSizeWarningLimit: 3000,
   },
 });

@@ -94,12 +94,23 @@ async function fetchServerTime() {
   try {
     const r = await fetch('/api/time', { cache: 'no-store' });
     const t = await r.json();
+
     const localNow = Date.now();
-    serverOffsetMs = t.now - localNow;
-    currentRoundId = t.roundId;
-    roundEndTime   = t.roundEnd;
-    saveRoundState({ startTs: t.roundEnd - t.roundMs, endTs: t.roundEnd, roundId: t.roundId });
-  } catch {}
+    serverOffsetMs = (typeof t.now === 'number' ? t.now : localNow) - localNow;
+
+    // tolerate API returning only now & roundEnd
+    const end = typeof t.roundEnd === 'number'
+      ? t.roundEnd
+      : Math.ceil((localNow + serverOffsetMs) / roundDuration) * roundDuration;
+
+    const start = end - roundDuration;
+    currentRoundId = Math.floor(start / roundDuration);
+    roundEndTime   = end;
+
+    saveRoundState({ startTs: start, endTs: end, roundId: currentRoundId });
+  } catch (e) {
+    console.warn('fetchServerTime failed', e);
+  }
 }
 
 // ====== Tabs ======
@@ -417,9 +428,20 @@ async function renderLeaderboard(){
 
 // ====== Boot ======
 const lastWallet = localStorage.getItem(LAST_WALLET_KEY);
-if (lastWallet && !walletAddress) { walletAddress = lastWallet; window.connectedWallet = walletAddress; $("#walletBtn").textContent = short(walletAddress); }
-await fetchServerTime();
-setInterval(fetchServerTime, 15000);
-initRoundFromStorageOrNew();
-renderMyOpenBetsForCurrentRound();
-renderLeaderboard();
+if (lastWallet && !walletAddress) {
+  walletAddress = lastWallet;
+  window.connectedWallet = walletAddress;
+  const wb = $("#walletBtn");
+  if (wb) wb.textContent = short(walletAddress);
+}
+
+(async function boot() {
+  try {
+    await fetchServerTime();
+  } finally {
+    setInterval(fetchServerTime, 15_000);
+  }
+  initRoundFromStorageOrNew();
+  renderMyOpenBetsForCurrentRound();
+  renderLeaderboard();
+})();
