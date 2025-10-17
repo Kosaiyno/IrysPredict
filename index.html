@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>IrysPredict — Prototype</title>
+    <title>IrysPredict </title>
 
     <!-- Inline favicon to kill 404 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="%2327f5cf"/><text x="50%25" y="54%25" font-size="36" text-anchor="middle" fill="white" font-family="Arial, Helvetica, sans-serif">IP</text></svg>' />
@@ -25,12 +25,12 @@
     </nav>
 
     <!-- Intro -->
-    <section class="intro" id="intro">
+    <section class="intro">
       <h2>Welcome to IrysPredict</h2>
       <p>
-        This is a simple, fast prediction game built on Irys datachain. Pick
-        whether an asset will go up or down and earn points if you’re right.
-        Rounds last <b>5 minutes</b>. Betting is open only in the first <b>1 minute</b>
+        This is a simple, fast prediction game built on Irys datachain.
+        Pick whether an asset will go up or down and earn points if you’re right.
+        Rounds last <b>5 minutes</b>. To keep it fair, betting is open only in the first <b>1 minute</b>
         of each round. After that, the round locks and resolves at the 5-minute mark.
       </p>
 
@@ -50,6 +50,8 @@
                 <h3>BTC · 5m</h3>
                 <small class="status live">Live · Ends in <span class="countdown">05:00</span></small>
               </div>
+              <!-- Will be set to the bet’s receipt after you place a bet -->
+              <a class="link betLink" href="#" target="_blank" rel="noreferrer" hidden>View on Irys ↗</a>
             </div>
             <div class="odds">
               <div><b class="pct up">--%</b> UP</div>
@@ -68,6 +70,8 @@
                 <h3>ETH · 5m</h3>
                 <small class="status live">Live · Ends in <span class="countdown">05:00</span></small>
               </div>
+              <!-- Will be set to the bet’s receipt after you place a bet -->
+              <a class="link betLink" href="#" target="_blank" rel="noreferrer" hidden>View on Irys ↗</a>
             </div>
             <div class="odds">
               <div><b class="pct up">--%</b> UP</div>
@@ -125,8 +129,7 @@
             </tbody>
           </table>
         </div>
-
-        <button id="pointsInfoBtn2" class="btn" type="button">How points work</button>
+        <!-- (Removed the extra "How points work" button that was below the table) -->
       </section>
     </main>
 
@@ -180,7 +183,7 @@
       </div>
     </dialog>
 
-    <footer class="foot"><span class="muted small">IrysPredict · Prototype</span></footer>
+    <!-- (Removed footer “IrysPredict · Prototype”) -->
 
     <script type="module" src="/src/app.js"></script>
   </body>
