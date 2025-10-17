@@ -78,7 +78,7 @@ async function ensureWallet() {
   walletAddress = await signerRef.getAddress();
   window.connectedWallet = walletAddress;
   localStorage.setItem(LAST_WALLET_KEY, walletAddress);
-  $("#walletBtn").textContent = short(walletAddress);
+  const wb = $("#walletBtn"); if (wb) wb.textContent = short(walletAddress);
   return { provider: providerRef, signer: signerRef, address: walletAddress };
 }
 async function ensureIrys() {
@@ -98,7 +98,6 @@ async function fetchServerTime() {
     const localNow = Date.now();
     serverOffsetMs = (typeof t.now === 'number' ? t.now : localNow) - localNow;
 
-    // tolerate API returning only now & roundEnd
     const end = typeof t.roundEnd === 'number'
       ? t.roundEnd
       : Math.ceil((localNow + serverOffsetMs) / roundDuration) * roundDuration;
@@ -170,7 +169,7 @@ function renderCountdown(ms){ const mins = Math.floor(ms / 60000); const secs = 
 function setBetButtonsEnabled(enabled){ $$(".betBtn").forEach((b)=> b.disabled = !enabled); }
 function updateCountdowns(){
   const now = Date.now() + serverOffsetMs;
-  const remaining = Math.max(0, roundEndTime - now);           // correct math
+  const remaining = Math.max(0, roundEndTime - now);
   const elapsed   = roundDuration - remaining;
   $$(".countdown").forEach((el)=> el.textContent = renderCountdown(remaining));
   $$(".active-bet .countdown").forEach((el)=> el.textContent = renderCountdown(remaining));
@@ -189,14 +188,14 @@ function clearOpenBetsForRound(rid){ const all = loadAllOpenBets(); delete all[r
 function renderMyOpenBetsForCurrentRound(){
   const last = localStorage.getItem(LAST_WALLET_KEY);
   if (!last) return;
-  if (!walletAddress) { walletAddress = last; window.connectedWallet = walletAddress; $("#walletBtn").textContent = short(walletAddress); }
+  if (!walletAddress) { walletAddress = last; window.connectedWallet = walletAddress; const wb=$("#walletBtn"); if(wb) wb.textContent = short(walletAddress); }
   const arr = loadOpenBetsForRound(currentRoundId).filter(b => b.wallet?.toLowerCase() === walletAddress.toLowerCase());
   $$(".active-bet").forEach(n => n.remove());
   arr.forEach(b=> showBetBelow(b.asset, b.side, b.reason, b.priceUsd));
   arr.forEach(b => { const card = document.querySelector(`[data-asset='${b.asset}']`); card?.querySelectorAll(".betBtn")?.forEach((btn)=> btn.disabled = true); });
 }
 
-// ====== Prices (CoinGecko) ======
+// ====== Prices (CoinGecko via Edge proxy) ======
 const STATIC_IDS = { BTC: "bitcoin", ETH: "ethereum" };
 const ID_CACHE_KEY = "cg_id_cache_v1";
 const idCache = JSON.parse(localStorage.getItem(ID_CACHE_KEY) || "{}");
@@ -223,31 +222,46 @@ function ensurePriceBadge(card){
 async function fetchPrices(){
   const cards = $$(".card");
   const symToId = {};
-  await Promise.all(cards.map(async (card)=>{ const sym = card.dataset.asset; symToId[sym] = await resolveCoinId(sym); }));
-  const ids = Object.values(symToId).filter(Boolean);
+  await Promise.all(cards.map(async (card)=>{
+    const sym = card.dataset.asset;
+    symToId[sym] = await resolveCoinId(sym);
+  }));
+  const ids = [...new Set(Object.values(symToId).filter(Boolean))];
   if(ids.length===0) return;
-  const url = "https://api.coingecko.com/api/v3/simple/price?vs_currencies=usd&include_24hr_change=true&ids=" + [...new Set(ids)].join(",");
+
   try{
-    const res = await fetch(url, { headers: { accept: "application/json" } });
-    if(!res.ok) return;
+    const res = await fetch(`/api/prices?ids=${encodeURIComponent(ids.join(","))}`, { cache: "no-store" });
+    if(!res.ok) throw new Error("prices api not ok");
     const data = await res.json();
+    if (data?.error) throw new Error(data.error);
+
     cards.forEach((card)=>{
       const sym = card.dataset.asset;
       const id = symToId[sym];
       if(!id || !data[id]) return;
+
       const price  = data[id].usd;
-      const change = data[id].usd_24h_change || 0;
-      latestPriceBySymbol[sym] = { id, price, change };
-      const upEl = card.querySelector(".pct.up"); const downEl = card.querySelector(".pct.down");
-      if (upEl)   upEl.textContent   = `${Math.max(change, 0).toFixed(2)}%`;
-      if (downEl) downEl.textContent = `${Math.max(-change, 0).toFixed(2)}%`;
-      const badge = ensurePriceBadge(card);
-      badge.textContent = fmtUsd(price, 2);
-      badge.style.borderColor = change >= 0 ? "var(--up)" : "var(--down)";
+      const change = data[id].usd_24hr_change ?? data[id].usd_24h_change ?? 0;
+
+      if (typeof price === "number") {
+        latestPriceBySymbol[sym] = { id, price, change: Number(change) || 0 };
+
+        const upEl = card.querySelector(".pct.up");
+        const downEl = card.querySelector(".pct.down");
+        if (upEl)   upEl.textContent   = `${Math.max(latestPriceBySymbol[sym].change, 0).toFixed(2)}%`;
+        if (downEl) downEl.textContent = `${Math.max(-latestPriceBySymbol[sym].change, 0).toFixed(2)}%`;
+
+        const badge = ensurePriceBadge(card);
+        badge.textContent = fmtUsd(price, 2);
+        badge.style.borderColor = latestPriceBySymbol[sym].change >= 0 ? "var(--up)" : "var(--down)";
+      }
     });
-  }catch{}
+  }catch(e){
+    console.warn("price fetch failed", e);
+  }
 }
-fetchPrices(); setInterval(fetchPrices, 30000);
+fetchPrices();
+setInterval(fetchPrices, 32000 + Math.floor(Math.random()*4000)); // 32–36s jitter
 
 // ====== Bet flow (Irys receipt stays) ======
 const betModal = $("#betModal");
@@ -348,7 +362,7 @@ function showBetBelow(asset, side, reason, priceUsd, irysId){
   card.appendChild(div);
 }
 
-// ====== Resolve bets + push global result to server (Vercel KV) ======
+// ====== Resolve bets + push global result (placeholder)
 async function postGlobalResult({ wallet, roundId, asset, win, delta, streak, best, ts, irysId }) {
   try {
     await fetch('/api/result', {
@@ -367,10 +381,9 @@ function resolveOpenBets(){
   for(const b of OPEN){ if(!byWallet[b.wallet]) byWallet[b.wallet]=[]; byWallet[b.wallet].push(b); }
 
   Object.entries(byWallet).forEach(async ([addr, list])=>{
-    // compute locally (same as before)
     let wins=0, losses=0;
     let streak=0, best=0;
-    let points=0, dayCount=0;
+    let dayCount=0;
 
     for (const b of list){
       const end = latestPriceBySymbol[b.asset]?.price;
@@ -384,9 +397,7 @@ function resolveOpenBets(){
 
       dayCount += 1;
       delta = Math.round(delta * dailyMultiplier(dayCount));
-      points += delta;
 
-      // push 1 record per bet to global API
       await postGlobalResult({
         wallet: addr, roundId: currentRoundId, asset: b.asset, win,
         delta, streak, best, ts: Date.now() + serverOffsetMs, irysId: b.irysId || null
@@ -397,7 +408,7 @@ function resolveOpenBets(){
   renderLeaderboard();
 }
 
-// ====== Global Leaderboard (always server) ======
+// ====== Global Leaderboard (server) ======
 async function fetchGlobalLeaderboard(){
   const res = await fetch('/api/leaderboard?limit=100', { cache: 'no-store' });
   if(!res.ok) throw new Error('global LB fetch failed');
@@ -421,7 +432,6 @@ async function renderLeaderboard(){
       </tr>`).join("") :
       `<tr><td>—</td><td>—</td><td>0</td><td>0</td><td>0</td><td class="col-hide-sm">0</td><td class="col-hide-sm">0</td></tr>`;
   }catch(e){
-    // if server fails, show explicit message (no silent local fallback)
     $("#lbBody").innerHTML = `<tr><td colspan="7">Global leaderboard unavailable.</td></tr>`;
   }
 }
@@ -444,4 +454,9 @@ if (lastWallet && !walletAddress) {
   initRoundFromStorageOrNew();
   renderMyOpenBetsForCurrentRound();
   renderLeaderboard();
+
+  // Points modal (both buttons)
+  $("#pointsInfoBtn")?.addEventListener("click", ()=> $("#pointsModal")?.showModal());
+  $("#pointsInfoBtn2")?.addEventListener("click", ()=> $("#pointsModal")?.showModal());
+  $("#closePointsBtn")?.addEventListener("click", ()=> $("#pointsModal")?.close());
 })();
