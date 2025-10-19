@@ -214,7 +214,7 @@ html.dark .table-wrap::-webkit-scrollbar-thumb{ background:#202833; }
   gap: 10px;
   font-weight: 700;
   font-size: 1.5rem;
-  color: var(--accent);
+  color: #00FFD0; /* fixed mint color */
 }
 
 .logo-img {
