@@ -20,7 +20,7 @@ const THEME_KEY         = "theme_pref_v1";
 // ====== Round / time sync ======
 let serverOffsetMs = 0; // serverNow - clientNow (for world sync)
 const roundDuration = 5 * 60 * 1000;
-const BET_LOCK_MS   = 60 * 1000;
+const BET_LOCK_MS = 0; // disable lock entirely
 
 let roundEndTime = 0;
 let currentRoundId = 0;
@@ -173,7 +173,7 @@ function updateCountdowns(){
   const elapsed   = roundDuration - remaining;
   $$(".countdown").forEach((el)=> el.textContent = renderCountdown(remaining));
   $$(".active-bet .countdown").forEach((el)=> el.textContent = renderCountdown(remaining));
-  if (elapsed >= BET_LOCK_MS) setBetButtonsEnabled(false); else setBetButtonsEnabled(true);
+  setBetButtonsEnabled(true);
   if (remaining <= 0) endRound();
 }
 setInterval(updateCountdowns, 1000);
@@ -274,10 +274,7 @@ let currentBet = { asset:null, side:null };
 
 $$(".betBtn").forEach((btn)=>
   btn.addEventListener("click", (e)=>{
-    const now = Date.now() + serverOffsetMs;
-    const remaining = Math.max(0, roundEndTime - now);
-    const elapsed   = (roundDuration - remaining);
-    if (elapsed >= BET_LOCK_MS){ alert("Betting is closed for this round. Please wait for the next round."); return; }
+    // lock check removed (always allow placing a bet UI)
     const card = e.currentTarget.closest(".card");
     const asset = card?.dataset.asset || "UNKNOWN";
     const side  = e.currentTarget.dataset.side;
@@ -301,10 +298,8 @@ betForm.addEventListener("submit", async (e)=>{
       b.wallet?.toLowerCase()===walletAddress.toLowerCase() && b.asset===asset
     );
     if(existing){ alert("You already placed a bet on this asset for this round."); return; }
-    const now = Date.now() + serverOffsetMs;
-    const remaining = Math.max(0, roundEndTime - now);
-    const elapsed   = (roundDuration - remaining);
-    if (elapsed >= BET_LOCK_MS){ alert("Betting is closed for this round. Please wait for the next round."); betModal.close(); return; }
+
+    // lock check removed (always allow bet submission)
     const priceSnap = latestPriceBySymbol[asset]?.price ?? null;
     const card = document.querySelector(`[data-asset='${asset}']`);
     card?.querySelectorAll(".betBtn")?.forEach((b)=> b.disabled = true);
