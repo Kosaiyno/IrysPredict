@@ -6,13 +6,17 @@
     <title>IrysPredict </title>
 
     <!-- Inline favicon to kill 404 -->
-    <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="%2327f5cf"/><text x="50%25" y="54%25" font-size="36" text-anchor="middle" fill="white" font-family="Arial, Helvetica, sans-serif">IP</text></svg>' />
+   <link rel="icon" type="image/jpeg" href="./src/logo.jpg" />
 
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
     <header class="topbar">
-      <h1 class="brand">IrysPredict</h1>
+     <h1 class="logo">
+        <img src="./src/logo.jpg" alt="IrysPredict logo" class="logo-img" />
+        IrysPredict
+     </h1>
+
       <div class="spacer"></div>
       <button id="themeBtn" class="pill" type="button">Dark mode</button>
       <button id="pointsInfoBtn" class="pill" type="button">How points work</button>
@@ -26,17 +30,17 @@
 
     <!-- Intro -->
    <section class="intro">
-  <h2>Welcome to IrysPredict</h2>
-  <p>
-    This is a simple, fast prediction game built on Irys datachain.
-    Pick whether an asset will go up or down and earn points if you’re right.
-    Rounds last <b>5 minutes</b>. <b>Betting is open for the entire round</b> and each round resolves when the timer hits 5:00.
-  </p>
+      <h2>Welcome to IrysPredict</h2>
+      <p>
+        This is a simple, fast prediction game built on Irys datachain.
+        Pick whether an asset will go up or down and earn points if you’re right.
+        Rounds last <b>5 minutes</b>. <b>Betting is open for the entire round</b> and each round resolves when the timer hits 5:00.
+      </p>
 
-  <div class="notice">
-    Round length: <b>5 minutes</b> · <b>Betting stays open until the round ends</b>
-  </div>
-</section>
+      <div class="notice">
+        Round length: <b>5 minutes</b> · <b>Betting stays open until the round ends</b>
+      </div>
+    </section>
 
 
     <main>

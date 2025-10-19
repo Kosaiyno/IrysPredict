@@ -207,3 +207,19 @@ html.dark .table-wrap::-webkit-scrollbar-thumb{ background:#202833; }
 
 /* Footer */
 .foot{padding:22px;text-align:center;color:var(--muted)}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 1.5rem;
+  color: var(--accent);
+}
+
+.logo-img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  border-radius: 6px;
+}
