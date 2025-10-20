@@ -263,80 +263,59 @@ async function fetchPrices(){
 fetchPrices();
 setInterval(fetchPrices, 32000 + Math.floor(Math.random()*4000)); // 32–36s jitter
 
-// ====== Bet flow (Irys receipt stays) ======
-const betModal = $("#betModal");
-const betForm = $("#betForm");
-const assetSpan = $("#assetSpan");
-const sideSpan = $("#sideSpan");
-const reasonInput = $("#reason");
-const priceAtSelectionSpan = $("#priceAtSelection");
-let currentBet = { asset:null, side:null };
-
+// ====== Bet flow (NO modal, instant sign) ======
 $$(".betBtn").forEach((btn)=>
-  btn.addEventListener("click", (e)=>{
-    // lock check removed (always allow placing a bet UI)
-    const card = e.currentTarget.closest(".card");
-    const asset = card?.dataset.asset || "UNKNOWN";
-    const side  = e.currentTarget.dataset.side;
-    currentBet = { asset, side };
-    assetSpan.textContent = asset;
-    sideSpan.textContent  = side;
-    const snap = latestPriceBySymbol[asset]?.price;
-    priceAtSelectionSpan.textContent = typeof snap === "number" ? fmtUsd(snap, 4) : "$--";
-    reasonInput.value = "";
-    betModal.showModal();
+  btn.addEventListener("click", async (e)=>{
+    try{
+      const card  = e.currentTarget.closest(".card");
+      const asset = card?.dataset.asset || "UNKNOWN";
+      const side  = e.currentTarget.dataset.side;
+
+      await ensureWallet();
+
+      // avoid duplicate bet on same asset in current round
+      const existing = loadOpenBetsForRound(currentRoundId).find(b =>
+        b.wallet?.toLowerCase()===walletAddress.toLowerCase() && b.asset===asset
+      );
+      if(existing){ alert("You already placed a bet on this asset for this round."); return; }
+
+      const priceSnap = latestPriceBySymbol[asset]?.price ?? null;
+
+      // disable both buttons on that card
+      card?.querySelectorAll(".betBtn")?.forEach((b)=> b.disabled = true);
+
+      // Upload to Irys
+      const uploader = await ensureIrys();
+      const ts = Date.now() + serverOffsetMs;
+      const payload = {
+        type: "prediction", wallet: walletAddress, asset, side,
+        reason: "", roundId: currentRoundId, ts,
+        priceUsdAtBet: priceSnap, app: "IrysPredict", network: "irys-testnet",
+      };
+      const tags = [
+        { name:"app", value:"irys-predict-prototype" },
+        { name:"type", value:"prediction" },
+        { name:"asset", value:asset },
+        { name:"side", value:side },
+        { name:"round-id", value:String(currentRoundId) },
+        { name:"wallet", value:walletAddress.toLowerCase() },
+        { name:"timestamp", value:String(ts) },
+        { name:"content-type", value:"application/json" },
+      ];
+      const receipt = await uploader.upload(JSON.stringify(payload), { tags });
+
+      // Persist locally + show
+      const bet = { wallet: walletAddress, asset, side, reason: "",
+        roundId: currentRoundId, ts, priceUsd: priceSnap, irysId: receipt?.id || null };
+      addOpenBet(bet);
+      showBetBelow(asset, side, "", priceSnap, bet.irysId);
+    }catch(err){
+      alert(err?.message || "Bet upload failed");
+      const card  = e.currentTarget.closest(".card");
+      card?.querySelectorAll(".betBtn")?.forEach((b)=> (b.disabled = false));
+    }
   })
 );
-$("#cancelBtn")?.addEventListener("click", ()=> betModal.close());
-
-betForm.addEventListener("submit", async (e)=>{
-  e.preventDefault();
-  const asset = currentBet.asset; const side  = currentBet.side;
-  try{
-    await ensureWallet();
-    const existing = loadOpenBetsForRound(currentRoundId).find(b =>
-      b.wallet?.toLowerCase()===walletAddress.toLowerCase() && b.asset===asset
-    );
-    if(existing){ alert("You already placed a bet on this asset for this round."); return; }
-
-    // lock check removed (always allow bet submission)
-    const priceSnap = latestPriceBySymbol[asset]?.price ?? null;
-    const card = document.querySelector(`[data-asset='${asset}']`);
-    card?.querySelectorAll(".betBtn")?.forEach((b)=> b.disabled = true);
-
-    // Upload Bet to Irys
-    const uploader = await ensureIrys();
-    const ts = Date.now() + serverOffsetMs;
-    const payload = {
-      type: "prediction", wallet: walletAddress, asset, side,
-      reason: reasonInput.value.trim(), roundId: currentRoundId, ts,
-      priceUsdAtBet: priceSnap, app: "IrysPredict", network: "irys-testnet",
-    };
-    const tags = [
-      { name:"app", value:"irys-predict-prototype" },
-      { name:"type", value:"prediction" },
-      { name:"asset", value:asset },
-      { name:"side", value:side },
-      { name:"round-id", value:String(currentRoundId) },
-      { name:"wallet", value:walletAddress.toLowerCase() },
-      { name:"timestamp", value:String(ts) },
-      { name:"content-type", value:"application/json" },
-    ];
-    const receipt = await uploader.upload(JSON.stringify(payload), { tags });
-
-    // Persist locally so we can resolve
-    const bet = { wallet: walletAddress, asset, side, reason: reasonInput.value.trim(),
-      roundId: currentRoundId, ts, priceUsd: priceSnap, irysId: receipt?.id || null };
-    addOpenBet(bet);
-
-    showBetBelow(asset, side, reasonInput.value.trim(), priceSnap, bet.irysId);
-    betModal.close();
-  }catch(err){
-    alert(err?.message || "Bet upload failed");
-    const card = document.querySelector(`[data-asset='${currentBet.asset}']`);
-    card?.querySelectorAll(".betBtn")?.forEach((b)=> (b.disabled = false));
-  }
-});
 
 function showBetBelow(asset, side, reason, priceUsd, irysId){
   const card = document.querySelector(`[data-asset='${asset}']`);
@@ -450,7 +429,7 @@ if (lastWallet && !walletAddress) {
   renderMyOpenBetsForCurrentRound();
   renderLeaderboard();
 
-  // Points modal (both buttons)
+  // Points modal (both buttons) — left as-is in case you still use it elsewhere
   $("#pointsInfoBtn")?.addEventListener("click", ()=> $("#pointsModal")?.showModal());
   $("#pointsInfoBtn2")?.addEventListener("click", ()=> $("#pointsModal")?.showModal());
   $("#closePointsBtn")?.addEventListener("click", ()=> $("#pointsModal")?.close());
