@@ -27,4 +27,14 @@ export default defineConfig({
     // optional, silences the big bundle warning
     chunkSizeWarningLimit: 3000,
   },
+  // dev server proxy so frontend can call /api/* while a local API shim runs on :8787
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8787',
+        changeOrigin: true,
+        secure: false,
+      }
+    }
+  }
 });

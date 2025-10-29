@@ -73,6 +73,13 @@ export default async function handler(req) {
   const url = new URL(req.url);
   const limit = Math.min(200, Number(url.searchParams.get('limit') || 100));
   const days = Number(url.searchParams.get('days') || 7);
-  const rows = await getLeaderboard({ limit, days, now: Date.now(), kv: { kvGet, kvZRange } });
-  return new Response(JSON.stringify({ rows }), { headers: { 'content-type': 'application/json' } });
+  try {
+    // let getLeaderboard lazy-import the KV helpers in runtime
+    const rows = await getLeaderboard({ limit, days, now: Date.now() });
+    return new Response(JSON.stringify({ rows }), { headers: { 'content-type': 'application/json' } });
+  } catch (err) {
+    // Surface a generic error (stack will be in Vercel logs). Do not leak secrets.
+    console.error('leaderboard handler error', String(err));
+    return new Response(JSON.stringify({ error: 'leaderboard error' }), { status: 500, headers: { 'content-type': 'application/json' } });
+  }
 }
