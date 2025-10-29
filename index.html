@@ -113,7 +113,18 @@
 
       <!-- Leaderboard -->
       <section id="leaderboard" class="tabpane">
-        <h2>Leaderboard (rolling 7 days)</h2>
+        <div class="lb-head">
+          <h2 id="lbTitle">Leaderboard (rolling 7 days)</h2>
+          <div class="lb-ctrl">
+            <label for="lbRange" class="muted">Window:</label>
+            <select id="lbRange" aria-label="Leaderboard timeframe">
+              <option value="1">1 day</option>
+              <option value="7" selected>7 days</option>
+              <option value="30">30 days</option>
+              <option value="0">All time</option>
+            </select>
+          </div>
+        </div>
 
         <div class="table-wrap">
           <table class="table table-lb" aria-label="Leaderboard">

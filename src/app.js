@@ -383,8 +383,10 @@ function resolveOpenBets(){
 }
 
 // ====== Global Leaderboard (server) ======
-async function fetchGlobalLeaderboard(){
-  const res = await fetch('/api/leaderboard?limit=100', { cache: 'no-store' });
+async function fetchGlobalLeaderboard(days = 7){
+  // days = 0 means all-time
+  const qp = `limit=100${days > 0 ? `&days=${encodeURIComponent(days)}` : ''}`;
+  const res = await fetch('/api/leaderboard?' + qp, { cache: 'no-store' });
   if(!res.ok) throw new Error('global LB fetch failed');
   const data = await res.json();
   return Array.isArray(data.rows) ? data.rows : [];
@@ -393,7 +395,9 @@ async function renderLeaderboard(){
   const tbody = $("#lbBody");
   if(!tbody) return;
   try{
-    const rows = await fetchGlobalLeaderboard();
+    const sel = document.querySelector('#lbRange');
+    const days = sel ? Number(sel.value) : 7;
+    const rows = await fetchGlobalLeaderboard(days);
     tbody.innerHTML = rows.length ? rows.map((r,i)=>`
       <tr>
         <td>${i+1}</td>
@@ -408,6 +412,17 @@ async function renderLeaderboard(){
   }catch(e){
     $("#lbBody").innerHTML = `<tr><td colspan="7">Global leaderboard unavailable.</td></tr>`;
   }
+}
+
+// wire timeframe selector (if present)
+const lbRangeSel = document.querySelector('#lbRange');
+const lbTitle = document.querySelector('#lbTitle');
+if (lbRangeSel) {
+  lbRangeSel.addEventListener('change', ()=>{
+    const v = Number(lbRangeSel.value);
+    if (lbTitle) lbTitle.textContent = v > 0 ? `Leaderboard (rolling ${v} day${v>1?'s':''})` : 'Leaderboard (all time)';
+    renderLeaderboard();
+  });
 }
 
 // ====== Boot ======
