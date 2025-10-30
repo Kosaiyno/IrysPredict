@@ -387,9 +387,14 @@ async function fetchGlobalLeaderboard(days = 7){
   // days = 0 means all-time; always include the days param so the server sees 0 explicitly
   const qp = `limit=100&days=${encodeURIComponent(String(days))}`;
   const res = await fetch('/api/leaderboard?' + qp, { cache: 'no-store' });
-  if(!res.ok) throw new Error('global LB fetch failed');
-  const data = await res.json();
-  return Array.isArray(data.rows) ? data.rows : [];
+  try{
+    const data = await res.json().catch(()=>null);
+    console.debug('fetchGlobalLeaderboard', { qp, status: res.status, rows: Array.isArray(data?.rows) ? data.rows.length : null });
+    return Array.isArray(data?.rows) ? data.rows : [];
+  }catch(e){
+    console.debug('fetchGlobalLeaderboard parse error', e);
+    throw e;
+  }
 }
 async function renderLeaderboard(){
   const tbody = $("#lbBody");
