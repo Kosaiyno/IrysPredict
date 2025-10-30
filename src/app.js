@@ -384,8 +384,8 @@ function resolveOpenBets(){
 
 // ====== Global Leaderboard (server) ======
 async function fetchGlobalLeaderboard(days = 7){
-  // days = 0 means all-time
-  const qp = `limit=100${days > 0 ? `&days=${encodeURIComponent(days)}` : ''}`;
+  // days = 0 means all-time; always include the days param so the server sees 0 explicitly
+  const qp = `limit=100&days=${encodeURIComponent(String(days))}`;
   const res = await fetch('/api/leaderboard?' + qp, { cache: 'no-store' });
   if(!res.ok) throw new Error('global LB fetch failed');
   const data = await res.json();
