@@ -15,6 +15,23 @@ function getWeekIdFromTs(tsMs) {
 }
 
 export default async function handler(req) {
+  // GET: public read of snapshot for given weekId (query) or current week
+  if (req.method === 'GET') {
+    try {
+      const url = new URL(req.url);
+      const weekId = url.searchParams.get('weekId') || getWeekIdFromTs(Date.now());
+      const mod = await import('./_kv.js');
+      const kvGet = mod.kvGet;
+      const snap = await kvGet(`lb:snapshot:${weekId}`).catch(()=>null);
+      const payload = snap?.result ?? null;
+      if (!payload) return new Response(JSON.stringify({ ok: false, error: 'not found' }), { status: 404, headers: { 'content-type': 'application/json' } });
+      return new Response(JSON.stringify({ ok: true, snapshot: payload }), { headers: { 'content-type': 'application/json' } });
+    } catch (err) {
+      console.error('snapshot_week GET error', String(err));
+      return new Response(JSON.stringify({ error: 'snapshot get failed' }), { status: 500, headers: { 'content-type': 'application/json' } });
+    }
+  }
+
   if (req.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
   const token = req.headers.get('x-snapshot-token');
   if (!process.env.SNAPSHOT_TOKEN || token !== process.env.SNAPSHOT_TOKEN) {
@@ -54,7 +71,7 @@ export default async function handler(req) {
     // also add to snapshot index zset for listing by time
     await kvZAdd('lb:snapshots:z', [{ score: now, member: weekId }]).catch(()=>{});
 
-    return new Response(JSON.stringify({ ok: true, weekId, winners: winners.length }), { headers: { 'content-type': 'application/json' } });
+    return new Response(JSON.stringify({ ok: true, weekId, winners }), { headers: { 'content-type': 'application/json' } });
   } catch (err) {
     console.error('snapshot_week error', String(err));
     return new Response(JSON.stringify({ error: 'snapshot failed' }), { status: 500, headers: { 'content-type': 'application/json' } });
