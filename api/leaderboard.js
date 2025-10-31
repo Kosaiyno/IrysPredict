@@ -25,38 +25,83 @@ export async function getLeaderboard({ limit = 100, days = 7, now = Date.now(), 
     kv = { kvGet: mod.kvGet, kvZRange: mod.kvZRange };
   }
   const { kvGet: _kvGet, kvZRange: _kvRange } = kv;
-  const cutoff = days > 0 ? now - Math.floor(days * 24 * 60 * 60 * 1000) : 0;
-
-  // fetch more than `limit` because we'll filter out members outside the window
-  const fetchMax = Math.min(1000, Math.max(limit * 5, limit + 50));
-  const z = await _kvRangeSafe(_kvRange, 'lb:z:points', -fetchMax, -1, true);
-  const arr = Array.isArray(z) ? z : [];
-
-  // z looks like ["member1","score1","member2","score2",...]
-  const pairs = [];
-  for (let i = arr.length - 2; i >= 0; i -= 2) {
-    pairs.push({ wallet: arr[i], points: Number(arr[i+1] || 0) });
+  // If days === 0 -> all-time (use global sorted set and cumulative stats)
+  if (!days || Number(days) === 0) {
+    const fetchMax = Math.min(1000, Math.max(limit * 5, limit + 50));
+    const z = await _kvRangeSafe(_kvRange, 'lb:z:points', -fetchMax, -1, true);
+    const arr = Array.isArray(z) ? z : [];
+    const pairs = [];
+    for (let i = arr.length - 2; i >= 0; i -= 2) {
+      pairs.push({ wallet: arr[i], points: Number(arr[i+1] || 0) });
+    }
+    const rows = [];
+    for (const p of pairs) {
+      if (rows.length >= limit) break;
+      const base = `lb:${p.wallet}`;
+      const wins   = await readNum(`${base}:wins`, _kvGet);
+      const losses = await readNum(`${base}:losses`, _kvGet);
+      const streak = await readNum(`${base}:streak`, _kvGet);
+      const best   = await readNum(`${base}:best`, _kvGet);
+      rows.push({ addr: p.wallet, points: p.points, wins, losses, streak, best });
+    }
+    return rows;
   }
 
-  const rows = [];
-  for (const p of pairs) {
-    if (rows.length >= limit) break;
-    const base = `lb:${p.wallet}`;
+  // If days === 7 -> use Friday-aligned weekly scoped zset and per-week stats
+  if (Number(days) === 7) {
+    const getWeekId = (tsMs) => {
+      const d = new Date(Number(tsMs));
+      const day = d.getUTCDay();
+      const daysSinceFriday = (day - 5 + 7) % 7;
+      const friday = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+      friday.setUTCDate(friday.getUTCDate() - daysSinceFriday);
+      const y = friday.getUTCFullYear();
+      const m = String(friday.getUTCMonth() + 1).padStart(2, '0');
+      const dd = String(friday.getUTCDate()).padStart(2, '0');
+      return `${y}-${m}-${dd}`;
+    };
 
-    // If a rolling window is requested, check the last activity timestamp
-    if (days > 0) {
-      const lastTs = await readLastTs(`${base}:lastTs`, _kvGet);
-      if (!lastTs || lastTs < cutoff) continue; // skip users with no recent activity
+    const weekId = getWeekId(now);
+    const zkey = `lb:week:${weekId}:z:points`;
+    const z = await _kvRangeSafe(_kvRange, zkey, -limit, -1, true);
+    const arr = Array.isArray(z) ? z : [];
+    const pairs = [];
+    for (let i = arr.length - 2; i >= 0; i -= 2) {
+      pairs.push({ wallet: arr[i], points: Number(arr[i+1] || 0) });
     }
+    const rows = [];
+    for (const p of pairs) {
+      if (rows.length >= limit) break;
+      const base = `lb:week:${weekId}:${p.wallet}`;
+      const wins   = await readNum(`${base}:wins`, _kvGet);
+      const losses = await readNum(`${base}:losses`, _kvGet);
+      const streak = await readNum(`${base}:streak`, _kvGet);
+      const best   = await readNum(`${base}:best`, _kvGet);
+      rows.push({ addr: p.wallet, points: p.points, wins, losses, streak, best });
+    }
+    return rows;
+  }
 
+  // Fallback: legacy rolling window based on lastTs
+  const cutoff = now - Math.floor(days * 24 * 60 * 60 * 1000);
+  const fetchMax = Math.min(1000, Math.max(limit * 5, limit + 50));
+  const zAll = await _kvRangeSafe(_kvRange, 'lb:z:points', -fetchMax, -1, true);
+  const arrAll = Array.isArray(zAll) ? zAll : [];
+  const pairsAll = [];
+  for (let i = arrAll.length - 2; i >= 0; i -= 2) pairsAll.push({ wallet: arrAll[i], points: Number(arrAll[i+1] || 0) });
+  const rowsAll = [];
+  for (const p of pairsAll) {
+    if (rowsAll.length >= limit) break;
+    const base = `lb:${p.wallet}`;
+    const lastTs = await readLastTs(`${base}:lastTs`, _kvGet);
+    if (!lastTs || lastTs < cutoff) continue;
     const wins   = await readNum(`${base}:wins`, _kvGet);
     const losses = await readNum(`${base}:losses`, _kvGet);
     const streak = await readNum(`${base}:streak`, _kvGet);
     const best   = await readNum(`${base}:best`, _kvGet);
-    rows.push({ addr: p.wallet, points: p.points, wins, losses, streak, best });
+    rowsAll.push({ addr: p.wallet, points: p.points, wins, losses, streak, best });
   }
-
-  return rows;
+  return rowsAll;
 }
 
 // small wrapper because Upstash call returns { result: [...] }

@@ -425,7 +425,7 @@ const lbTitle = document.querySelector('#lbTitle');
 if (lbRangeSel) {
   lbRangeSel.addEventListener('change', ()=>{
     const v = Number(lbRangeSel.value);
-    if (lbTitle) lbTitle.textContent = v > 0 ? `Leaderboard (rolling ${v} day${v>1?'s':''})` : 'Leaderboard (all time)';
+    if (lbTitle) lbTitle.textContent = v === 0 ? 'Leaderboard (all time)' : 'Leaderboard (this week — Friday → Thursday)';
     renderLeaderboard();
   });
 }

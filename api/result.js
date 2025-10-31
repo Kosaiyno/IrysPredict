@@ -41,6 +41,45 @@ export async function processResult(body, kv) {
   const newPoints = Number(p?.result ?? 0);
   await _kvZAdd('lb:z:points', [{ score: newPoints, member: w }]).catch(()=>{});
 
+  // --- Weekly (Friday-aligned) scoped stats ---
+  try {
+    const getWeekId = (tsMs) => {
+      const d = new Date(Number(tsMs));
+      // use UTC day (0 = Sunday, 5 = Friday)
+      const day = d.getUTCDay();
+      const daysSinceFriday = (day - 5 + 7) % 7;
+      const friday = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+      friday.setUTCDate(friday.getUTCDate() - daysSinceFriday);
+      // week id as YYYY-MM-DD
+      const y = friday.getUTCFullYear();
+      const m = String(friday.getUTCMonth() + 1).padStart(2, '0');
+      const dd = String(friday.getUTCDate()).padStart(2, '0');
+      return `${y}-${m}-${dd}`;
+    };
+
+    const weekId = getWeekId(ts);
+    const wPointsKey = `lb:week:${weekId}:${w}:points`;
+    const wWinsKey   = `lb:week:${weekId}:${w}:wins`;
+    const wLossesKey = `lb:week:${weekId}:${w}:losses`;
+    const wStreakKey = `lb:week:${weekId}:${w}:streak`;
+    const wBestKey   = `lb:week:${weekId}:${w}:best`;
+    const wZKey      = `lb:week:${weekId}:z:points`;
+
+    // increment weekly counters
+    const wp = await _kvIncrBy(wPointsKey, pointsDelta).catch(()=>({ result: 0 }));
+    await _kvIncrBy(wWinsKey,   win ? 1 : 0).catch(()=>{});
+    await _kvIncrBy(wLossesKey, win ? 0 : 1).catch(()=>{});
+
+    // write weekly streak/best as strings (keep parity with existing keys)
+    await _kvSet(wStreakKey, String(streak), { ex: 7 * 24 * 60 * 60 }).catch(()=>{});
+    await _kvSet(wBestKey,   String(best),   { ex: 7 * 24 * 60 * 60 }).catch(()=>{});
+
+    const newWeekPoints = Number(wp?.result ?? 0);
+    await _kvZAdd(wZKey, [{ score: newWeekPoints, member: w }]).catch(()=>{});
+  } catch(e) {
+    // swallow weekly errors to avoid breaking the main flow
+  }
+
   return { ok: true, newPoints };
 }
 
