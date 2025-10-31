@@ -1,0 +1,24 @@
+name: Weekly LB Snapshot
+
+on:
+  schedule:
+    # Every Thursday at 23:59 UTC (right before weekly rollover to Friday)
+    - cron: '59 23 * * 4'
+  workflow_dispatch: {}
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call snapshot endpoint
+        env:
+          SNAPSHOT_TOKEN: ${{ secrets.SNAPSHOT_TOKEN }}
+          SITE_URL: https://iryspredict.xyz
+        run: |
+          echo "Calling snapshot endpoint for site $SITE_URL"
+          status=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$SITE_URL/api/snapshot_week" -H "x-snapshot-token: $SNAPSHOT_TOKEN" )
+          echo "HTTP status: $status"
+          if [ "$status" -ne 200 ]; then
+            echo "Snapshot failed with status $status"
+            exit 1
+          fi
