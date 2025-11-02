@@ -419,9 +419,48 @@ async function renderLeaderboard(){
   }
 }
 
-// wire timeframe selector (if present)
-const lbRangeSel = document.querySelector('#lbRange');
+// wire timeframe selector (pills or legacy select)
 const lbTitle = document.querySelector('#lbTitle');
+const pillGroup = document.querySelector('#lbRangePills');
+const lbRangeSel = document.querySelector('#lbRange'); // legacy fallback
+
+function setActivePill(btn){
+  if (!btn) return;
+  const all = pillGroup ? [...pillGroup.querySelectorAll('.seg-btn')] : [];
+  all.forEach(b => b.setAttribute('aria-pressed','false'));
+  btn.setAttribute('aria-pressed','true');
+  const v = Number(btn.dataset.days);
+  if (lbTitle) lbTitle.textContent = v === 0 ? 'Leaderboard (all time)' : 'Leaderboard (this week — Friday → Thursday)';
+  renderLeaderboard();
+}
+
+if (pillGroup) {
+  pillGroup.addEventListener('click', (e)=>{
+    const btn = e.target.closest('.seg-btn');
+    if (!btn) return;
+    setActivePill(btn);
+  });
+
+  // keyboard navigation (left/right) and activation (enter/space)
+  pillGroup.addEventListener('keydown', (e)=>{
+    const keys = ['ArrowLeft','ArrowRight','Enter',' '];
+    if (!keys.includes(e.key)) return;
+    const buttons = [...pillGroup.querySelectorAll('.seg-btn')];
+    const idx = buttons.indexOf(document.activeElement);
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight'){
+      e.preventDefault();
+      const dir = e.key === 'ArrowLeft' ? -1 : 1;
+      const next = buttons[(idx + dir + buttons.length) % buttons.length];
+      next.focus();
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      const btn = document.activeElement.closest('.seg-btn');
+      if (btn) setActivePill(btn);
+    }
+  });
+}
+
+// legacy select fallback
 if (lbRangeSel) {
   lbRangeSel.addEventListener('change', ()=>{
     const v = Number(lbRangeSel.value);

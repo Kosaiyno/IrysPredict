@@ -15,13 +15,36 @@ function getWeekIdFromTs(tsMs) {
 }
 
 export default async function handler(req) {
-  // GET: public read of snapshot for given weekId (query) or current week
+  // GET: support two modes:
+  //  - ?list=1  -> returns list of available snapshots (weekId + ts) from lb:snapshots:z
+  //  - ?weekId=YYYY-MM-DD -> return that snapshot (same as before)
   if (req.method === 'GET') {
     try {
       const url = new URL(req.url);
-      const weekId = url.searchParams.get('weekId') || getWeekIdFromTs(Date.now());
+      // require snapshot token for any GET/list access
+      const token = req.headers.get('x-snapshot-token');
+      if (!process.env.SNAPSHOT_TOKEN || token !== process.env.SNAPSHOT_TOKEN) {
+        return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401, headers: { 'content-type': 'application/json' } });
+      }
       const mod = await import('./_kv.js');
       const kvGet = mod.kvGet;
+      const kvZRange = mod.kvZRange;
+
+      if (url.searchParams.get('list')) {
+        // list stored snapshots (return newest first)
+        const raw = await kvZRange('lb:snapshots:z', 0, -1, true).catch(()=>null);
+        const arr = Array.isArray(raw?.result) ? raw.result : Array.isArray(raw) ? raw : [];
+        const out = [];
+        for (let i = 0; i < arr.length; i += 2) {
+          const member = arr[i];
+          const score = Number(arr[i+1] || 0);
+          out.push({ weekId: member, ts: score });
+        }
+        out.reverse(); // newest first
+        return new Response(JSON.stringify({ ok: true, snapshots: out }), { headers: { 'content-type': 'application/json' } });
+      }
+
+      const weekId = url.searchParams.get('weekId') || getWeekIdFromTs(Date.now());
       const snap = await kvGet(`lb:snapshot:${weekId}`).catch(()=>null);
       const payload = snap?.result ?? null;
       if (!payload) return new Response(JSON.stringify({ ok: false, error: 'not found' }), { status: 404, headers: { 'content-type': 'application/json' } });

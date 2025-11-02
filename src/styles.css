@@ -223,3 +223,18 @@ html.dark .table-wrap::-webkit-scrollbar-thumb{ background:#202833; }
   object-fit: contain;
   border-radius: 6px;
 }
+
+/* Segmented pills for small controls (leaderboard timeframe) */
+.segmented{ display:inline-flex; gap:6px; align-items:center; margin-left:10px }
+.seg-btn{
+  padding:6px 10px;border-radius:999px;border:1px solid var(--border);
+  background:var(--panel-2); color:var(--text); cursor:pointer; font-size:13px;
+  min-width:120px; text-align:center;
+}
+.seg-btn[aria-pressed="true"]{
+  background:var(--mint); color:#071014; border-color:var(--mint); box-shadow: 0 4px 12px rgba(25,216,182,0.12);
+}
+.seg-btn:focus{ outline:3px solid rgba(39,245,207,0.15); outline-offset:2px }
+.seg-btn:hover{ border-color:var(--mint) }
+
+@media (max-width:480px){ .segmented .seg-btn{ min-width:90px; padding:6px 8px; font-size:12px } }

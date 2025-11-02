@@ -10,15 +10,51 @@ jobs:
   snapshot:
     runs-on: ubuntu-latest
     steps:
-      - name: Call snapshot endpoint
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Call snapshot endpoint and save to repo
         env:
           SNAPSHOT_TOKEN: ${{ secrets.SNAPSHOT_TOKEN }}
           SITE_URL: https://iryspredict.xyz
+          GIT_PUBLISH_BRANCH: main
         run: |
+          set -euo pipefail
           echo "Calling snapshot endpoint for site $SITE_URL"
-          status=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$SITE_URL/api/snapshot_week" -H "x-snapshot-token: $SNAPSHOT_TOKEN" )
-          echo "HTTP status: $status"
-          if [ "$status" -ne 200 ]; then
-            echo "Snapshot failed with status $status"
+          # Call endpoint and capture body + HTTP status on last line
+          resp=$(curl -s -w "\n%{http_code}" -X POST "$SITE_URL/api/snapshot_week" -H "x-snapshot-token: $SNAPSHOT_TOKEN")
+          http_code=$(echo "$resp" | tail -n1)
+          body=$(echo "$resp" | sed '$d')
+          echo "HTTP status: $http_code"
+          if [ "$http_code" -ne 200 ]; then
+            echo "Snapshot failed with status $http_code"
+            echo "Response body: $body"
             exit 1
           fi
+
+          # Extract weekId from response body
+          weekId=$(echo "$body" | jq -r '.weekId // empty')
+          if [ -z "$weekId" ]; then
+            echo "No weekId in response, writing response to snapshots/unknown-$(date -u +%Y%m%dT%H%M%SZ).json"
+            mkdir -p snapshots
+            echo "$body" | jq '.' > "snapshots/unknown-$(date -u +%Y%m%dT%H%M%SZ).json"
+          else
+            mkdir -p snapshots
+            echo "Saving snapshot for weekId=$weekId to snapshots/$weekId.json"
+            echo "$body" | jq '.' > "snapshots/$weekId.json"
+          fi
+
+          # Commit and push the snapshot file back to the repo
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add snapshots || true
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: add weekly snapshot $weekId" || true
+            git push origin "$GIT_PUBLISH_BRANCH"
+          fi
+
+      - name: List saved snapshots (for logs)
+        run: |
+          ls -la snapshots || true

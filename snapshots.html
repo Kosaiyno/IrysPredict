@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>IrysPredict · Snapshots</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <h1 class="logo">
+        <img src="./src/logo.jpg" alt="IrysPredict logo" class="logo-img" />
+        Snapshots
+      </h1>
+      <div class="spacer"></div>
+      <a href="/" class="pill">Home</a>
+    </header>
+
+    <main class="page">
+      <section class="container">
+        <h2>Weekly Snapshots</h2>
+        <p class="muted">Browse stored weekly top-3 snapshots. Click a week to view winners.</p>
+
+        <div id="auth" style="margin-bottom:1rem">
+          <label class="muted">Admin token:</label>
+          <input id="tokenInput" class="input" type="password" placeholder="Enter admin token" style="margin-left:0.5rem" />
+          <button id="unlockBtn" class="btn ghost" style="margin-left:0.5rem">Unlock</button>
+          <div id="authMsg" class="muted" style="margin-top:0.5rem">You must enter the admin snapshot token to view snapshots.</div>
+        </div>
+
+        <div id="listWrap" hidden>
+          <div id="list">Loading snapshots…</div>
+        </div>
+
+        <h3 id="detailsTitle" style="margin-top:1.5rem">Snapshot details</h3>
+        <div id="snapshotDetails">Select a week to view details.</div>
+      </section>
+    </main>
+
+    <script>
+      let adminToken = null;
+
+      function showAuthMsg(msg, err) {
+        const a = document.getElementById('authMsg');
+        a.textContent = msg;
+        a.style.color = err ? 'crimson' : '';
+      }
+
+      async function fetchListWithToken() {
+        const el = document.getElementById('list');
+        try {
+          const res = await fetch('/api/snapshot_week?list=1', { headers: { 'x-snapshot-token': adminToken } });
+          if (res.status === 401) {
+            showAuthMsg('Unauthorized token — try again.', true);
+            return;
+          }
+          const j = await res.json();
+          if (!j?.ok || !Array.isArray(j.snapshots) || j.snapshots.length === 0) {
+            el.innerHTML = '<p class="muted">No snapshots available yet.</p>';
+            return;
+          }
+          const ul = document.createElement('ul');
+          ul.className = 'list-group';
+          j.snapshots.forEach(s => {
+            const li = document.createElement('li');
+            li.className = 'list-item';
+            const a = document.createElement('a');
+            a.href = '#';
+            a.textContent = `${s.weekId} — ${new Date(s.ts).toUTCString()}`;
+            a.addEventListener('click', (e)=>{ e.preventDefault(); loadSnapshot(s.weekId); });
+            li.appendChild(a);
+            ul.appendChild(li);
+          });
+          el.innerHTML = '';
+          el.appendChild(ul);
+        } catch (err) {
+          el.innerHTML = '<p class="muted">Failed to load snapshots.</p>';
+          console.error(err);
+        }
+      }
+
+      async function loadSnapshot(weekId) {
+        const wrap = document.getElementById('snapshotDetails');
+        const title = document.getElementById('detailsTitle');
+        title.textContent = `Snapshot ${weekId}`;
+        wrap.innerHTML = 'Loading…';
+        try {
+          const res = await fetch('/api/snapshot_week?weekId=' + encodeURIComponent(weekId), { headers: { 'x-snapshot-token': adminToken } });
+          if (res.status === 401) {
+            wrap.innerHTML = '<p class="muted">Unauthorized. Check token.</p>';
+            return;
+          }
+          if (!res.ok) {
+            const j = await res.json().catch(()=>null);
+            wrap.innerHTML = `<p class="muted">Snapshot not found${j?.error ? ': '+j.error : ''}</p>`;
+            return;
+          }
+          const j = await res.json();
+          const snap = j.snapshot;
+          if (!snap) {
+            wrap.innerHTML = '<p class="muted">No snapshot data.</p>';
+            return;
+          }
+          const out = [];
+          out.push(`<p class="muted">Saved: ${new Date(snap.ts).toUTCString()}</p>`);
+          if (Array.isArray(snap.winners) && snap.winners.length) {
+            out.push('<table class="table"><thead><tr><th>#</th><th>Wallet</th><th>Points</th><th>Wins</th><th>Losses</th></tr></thead><tbody>');
+            snap.winners.forEach((w, i) => {
+              out.push(`<tr><td>${i+1}</td><td><code>${w.wallet}</code></td><td>${w.points}</td><td>${w.wins}</td><td>${w.losses}</td></tr>`);
+            });
+            out.push('</tbody></table>');
+          } else {
+            out.push('<p class="muted">No winners recorded.</p>');
+          }
+          wrap.innerHTML = out.join('\n');
+        } catch (err) {
+          wrap.innerHTML = '<p class="muted">Failed to load snapshot.</p>';
+          console.error(err);
+        }
+      }
+
+      document.getElementById('unlockBtn').addEventListener('click', ()=>{
+        const v = document.getElementById('tokenInput').value.trim();
+        if (!v) { showAuthMsg('Please enter a token', true); return; }
+        adminToken = v;
+        document.getElementById('auth').style.display = 'none';
+        document.getElementById('listWrap').hidden = false;
+        showAuthMsg('Fetching snapshots…', false);
+        fetchListWithToken();
+      });
+
+      // also allow pressing Enter in input
+      document.getElementById('tokenInput').addEventListener('keypress', (e)=>{
+        if (e.key === 'Enter') { e.preventDefault(); document.getElementById('unlockBtn').click(); }
+      });
+    </script>
+  </body>
+</html>

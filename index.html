@@ -17,10 +17,10 @@
         IrysPredict
      </h1>
 
-      <div class="spacer"></div>
-      <button id="themeBtn" class="pill" type="button">Dark mode</button>
-      <button id="pointsInfoBtn" class="pill" type="button">How points work</button>
-      <button id="walletBtn" class="btn mint" type="button">Connect Wallet</button>
+  <div class="spacer"></div>
+  <button id="themeBtn" class="pill" type="button">Dark mode</button>
+  <button id="pointsInfoBtn" class="pill" type="button">How points work</button>
+  <button id="walletBtn" class="btn mint" type="button">Connect Wallet</button>
     </header>
 
     <nav class="tabs">
@@ -29,43 +29,22 @@
     </nav>
 
     <!-- Intro -->
-   <section class="intro">
+    <section class="intro">
       <h2>Welcome to IrysPredict</h2>
       <p>
-        This is a simple, fast prediction game built on Irys datachain.
-        Pick whether an asset will go up or down and earn points if you’re right.
-        Rounds last <b>5 minutes</b>. <b>Betting is open for the entire round</b> and each round resolves when the timer hits 5:00.
+        IrysPredict is a simple prediction game built on Irys.
+        You pick if an asset’s price will finish higher or lower than it is right now when the <b>5-minute</b> round ends.
+        Once you choose Up or Down, you sign with your wallet and your bet is stored permanently on Irys.
+        When the round ends, the app checks the prices — if you predicted right, you earn points and move up on the global leaderboard.
       </p>
 
       <div class="notice">
-        Round length: <b>5 minutes</b> · <b>Betting stays open until the round ends</b>
+        Round length: <b>5 minutes</b>
       </div>
     </section>
-
-
     <main>
-      <!-- Markets -->
       <section id="markets" class="tabpane active">
         <div class="cards">
-          <!-- BTC -->
-          <div class="card" data-asset="BTC">
-            <div class="card-head">
-              <div>
-                <h3>BTC · 5m</h3>
-                <small class="status live">Live · Ends in <span class="countdown">05:00</span></small>
-              </div>
-              <!-- Will be set to the bet’s receipt after you place a bet -->
-              <a class="link betLink" href="#" target="_blank" rel="noreferrer" hidden>View on Irys ↗</a>
-            </div>
-            <div class="odds">
-              <div><b class="pct up">--%</b> UP</div>
-              <div><b class="pct down">--%</b> DOWN</div>
-            </div>
-            <div class="actions">
-              <button class="btn up betBtn" data-side="UP" type="button">UP</button>
-              <button class="btn down betBtn" data-side="DOWN" type="button">DOWN</button>
-            </div>
-          </div>
 
           <!-- ETH -->
           <div class="card" data-asset="ETH">
@@ -116,11 +95,11 @@
         <div class="lb-head">
           <h2 id="lbTitle">Leaderboard (rolling 7 days)</h2>
           <div class="lb-ctrl">
-            <label for="lbRange" class="muted">Window:</label>
-            <select id="lbRange" aria-label="Leaderboard timeframe">
-              <option value="7" selected>7 days (week)</option>
-              <option value="0">All time</option>
-            </select>
+            <label class="muted">Window:</label>
+            <div id="lbRangePills" class="segmented" role="tablist" aria-label="Leaderboard timeframe">
+              <button class="seg-btn" data-days="7" aria-pressed="true" type="button">7 days (week)</button>
+              <button class="seg-btn" data-days="0" aria-pressed="false" type="button">All time</button>
+            </div>
           </div>
         </div>
 
@@ -168,7 +147,7 @@
     <dialog id="roundModal" class="modal">
       <div class="modal-box round-start-box">
         <h2>New Round</h2>
-        <p class="muted">You have 5 minutes per round. Bets close at 1:00.</p>
+        <p class="muted">You have 5 minutes per round.</p>
         <p class="muted">Next round begins in <span id="roundCountdown">0:05</span>…</p>
         <button id="startRoundBtn" class="btn mint" type="button">Start</button>
       </div>
