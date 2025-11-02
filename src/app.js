@@ -400,8 +400,10 @@ async function renderLeaderboard(){
   const tbody = $("#lbBody");
   if(!tbody) return;
   try{
-    const sel = document.querySelector('#lbRange');
-    const days = sel ? Number(sel.value) : 7;
+  // Determine the selected timeframe: prefer pill group (segmented buttons),
+  // fall back to legacy select if present, default to 7 days.
+  const activePill = document.querySelector('#lbRangePills .seg-btn[aria-pressed="true"]');
+  const days = activePill ? Number(activePill.dataset.days) : (lbRangeSel ? Number(lbRangeSel.value) : 7);
     const rows = await fetchGlobalLeaderboard(days);
     tbody.innerHTML = rows.length ? rows.map((r,i)=>`
       <tr>
