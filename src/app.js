@@ -396,6 +396,74 @@ async function fetchGlobalLeaderboard(days = 7){
     throw e;
   }
 }
+// ====== Weekly Hero ======
+function formatCountdown(ms){
+  if(ms<=0) return '00:00:00:00';
+  const sec = Math.floor(ms/1000);
+  const days = Math.floor(sec / 86400);
+  const hours = Math.floor((sec % 86400) / 3600);
+  const mins = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  return `${String(days).padStart(2,'0')}:${String(hours).padStart(2,'0')}:${String(mins).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function getNextThursdayEndUtc(nowMs){
+  const now = new Date(nowMs);
+  // weekday: 0 Sun .. 4 Thu .. 5 Fri
+  const utcDay = now.getUTCDay();
+  const daysUntilThu = (4 - utcDay + 7) % 7; // 0 means today is Thu
+  const target = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  target.setUTCDate(target.getUTCDate() + daysUntilThu);
+  // set to Thursday 23:59:59.999
+  target.setUTCHours(23,59,59,999);
+  // if target is in the past (today is Thu but past end), add 7 days
+  if (target.getTime() <= nowMs) target.setUTCDate(target.getUTCDate() + 7);
+  return target.getTime();
+}
+
+async function renderWeeklyHero(){
+  const hero = document.getElementById('weeklyHero');
+  if(!hero) return;
+
+  // wire CTA buttons
+  const joinBtn = document.getElementById('joinWeeklyBtn');
+  const viewBtn = document.getElementById('viewWeeklyBtn');
+  joinBtn?.addEventListener('click', ()=>{ document.querySelector('.tab[data-tab="markets"]')?.click(); document.querySelector('.tab[data-tab="markets"]')?.dispatchEvent(new Event('click')); });
+  viewBtn?.addEventListener('click', ()=>{ document.querySelector('.tab[data-tab="leaderboard"]')?.click(); });
+
+  // countdown
+  const countdownEl = document.getElementById('weeklyCountdown');
+  const endsLabel = document.getElementById('weeklyEndsLabel');
+
+  function updateCountdown(){
+    const now = Date.now() + serverOffsetMs;
+    const target = getNextThursdayEndUtc(now);
+    const remaining = Math.max(0, target - now);
+    if (countdownEl) countdownEl.textContent = formatCountdown(remaining);
+    if (endsLabel) {
+      const d = new Date(target);
+      const opts = { weekday:'short', hour:'2-digit', minute:'2-digit', timeZone:'UTC' };
+      endsLabel.textContent = d.toUTCString().split(' ').slice(0,4).join(' ')+ ' UTC';
+    }
+  }
+  updateCountdown();
+  setInterval(updateCountdown, 1000);
+
+  // populate top 3 from weekly leaderboard (days=7)
+  try{
+    const rows = await fetchGlobalLeaderboard(7);
+    const list = document.getElementById('weeklyTop3');
+    if(!list) return;
+    list.innerHTML = [0,1,2].map(i=>{
+      const r = rows[i];
+      if(!r) return `<li class="empty">${i+1}. — <span class="muted">(No data)</span></li>`;
+      const addr = short(r.addr);
+      const pts = r.points ?? 0;
+      const prizeSplit = [25,15,10][i] || 0;
+      return `<li>${i+1}. <strong>${addr}</strong> <span class="muted">· ${pts} pts</span> <span style="float:right;font-weight:700">${prizeSplit ? '$'+prizeSplit : ''}</span></li>`;
+    }).join('');
+  }catch(e){ console.warn('weekly hero populate failed', e); }
+}
 async function renderLeaderboard(){
   const tbody = $("#lbBody");
   if(!tbody) return;
@@ -489,6 +557,7 @@ if (lastWallet && !walletAddress) {
   initRoundFromStorageOrNew();
   renderMyOpenBetsForCurrentRound();
   renderLeaderboard();
+  renderWeeklyHero();
 
   // Points modal (both buttons) — left as-is in case you still use it elsewhere
   $("#pointsInfoBtn")?.addEventListener("click", ()=> $("#pointsModal")?.showModal());

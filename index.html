@@ -23,6 +23,39 @@
   <button id="walletBtn" class="btn mint" type="button">Connect Wallet</button>
     </header>
 
+    <!-- Weekly Competition Hero (pinned) -->
+    <div id="weeklyHero" class="weekly-hero" role="region" aria-label="Weekly competition" data-prize="50">
+      <div class="weekly-inner">
+        <div class="left">
+          <h3>Weekly Showdown — Top 3 Win $50</h3>
+          <p class="tagline">Juicy prizes. Fierce leaderboard. New week starts every Friday — climb the ranks and grab your share.</p>
+          <div class="prize-split">
+            <div class="p1"><span class="amt">$25</span><small>1st</small></div>
+            <div class="p2"><span class="amt">$15</span><small>2nd</small></div>
+            <div class="p3"><span class="amt">$10</span><small>3rd</small></div>
+          </div>
+          <div class="hero-cta">
+            <button id="joinWeeklyBtn" class="btn mint">Play this week — Win $25</button>
+            <button id="viewWeeklyBtn" class="btn ghost">See leaderboard</button>
+          </div>
+        </div>
+        <div class="right">
+          <div class="countdown-box">
+            <small class="muted">Week ends</small>
+            <div id="weeklyCountdown" class="countdown-large">—:—:—:—</div>
+            <small id="weeklyEndsLabel" class="muted">Thu · 23:59 UTC</small>
+          </div>
+          <div class="top3-list">
+            <ol id="weeklyTop3">
+              <li class="empty">1. — <span class="muted">(No data)</span></li>
+              <li class="empty">2. — <span class="muted">(No data)</span></li>
+              <li class="empty">3. — <span class="muted">(No data)</span></li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <nav class="tabs">
       <button class="tab active" data-tab="markets" type="button">Markets</button>
       <button class="tab" data-tab="leaderboard" type="button">Leaderboard</button>
