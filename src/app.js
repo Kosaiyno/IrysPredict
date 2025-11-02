@@ -464,7 +464,7 @@ async function renderLeaderboard(){
         <td class="col-hide-sm">${r.streak ?? 0}</td>
         <td class="col-hide-sm">${r.best ?? 0}</td>
       </tr>`).join("") :
-      `<tr><td>—</td><td>—</td><td>0</td><td>0</td><td>0</td><td class="col-hide-sm">0</td><td class="col-hide-sm">0</td></tr>`;
+      `<tr><td>-</td><td>-</td><td>0</td><td>0</td><td>0</td><td class="col-hide-sm">0</td><td class="col-hide-sm">0</td></tr>`;
   }catch(e){
     $("#lbBody").innerHTML = `<tr><td colspan="7">Global leaderboard unavailable.</td></tr>`;
   }
@@ -485,7 +485,7 @@ function setActivePill(btn){
   renderLeaderboard();
 }
 
-if (pillGroup) {
+  if (pillGroup) {
   pillGroup.addEventListener('click', (e)=>{
     const btn = e.target.closest('.seg-btn');
     if (!btn) return;
@@ -512,10 +512,10 @@ if (pillGroup) {
 }
 
 // legacy select fallback
-if (lbRangeSel) {
+  if (lbRangeSel) {
   lbRangeSel.addEventListener('change', ()=>{
     const v = Number(lbRangeSel.value);
-    if (lbTitle) lbTitle.textContent = v === 0 ? 'Leaderboard (all time)' : 'Leaderboard (this week — Friday → Thursday)';
+    if (lbTitle) lbTitle.textContent = v === 0 ? 'Leaderboard (all time)' : 'Leaderboard (this week - Friday → Thursday)';
     renderLeaderboard();
   });
 }
@@ -540,7 +540,7 @@ if (lastWallet && !walletAddress) {
   renderLeaderboard();
   renderWeeklyHero();
 
-  // Points modal (both buttons) — left as-is in case you still use it elsewhere
+  // Points modal (both buttons) left as-is in case you still use it elsewhere
   $("#pointsInfoBtn")?.addEventListener("click", ()=> $("#pointsModal")?.showModal());
   $("#pointsInfoBtn2")?.addEventListener("click", ()=> $("#pointsModal")?.showModal());
   $("#closePointsBtn")?.addEventListener("click", ()=> $("#pointsModal")?.close());
