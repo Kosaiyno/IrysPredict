@@ -481,7 +481,7 @@ function setActivePill(btn){
   all.forEach(b => b.setAttribute('aria-pressed','false'));
   btn.setAttribute('aria-pressed','true');
   const v = Number(btn.dataset.days);
-  if (lbTitle) lbTitle.textContent = v === 0 ? 'Leaderboard (all time)' : 'Leaderboard (this week — Friday → Thursday)';
+  if (lbTitle) lbTitle.textContent = v === 0 ? 'Leaderboard (all time)' : 'Leaderboard (this week, Friday → Thursday)';
   renderLeaderboard();
 }
 
@@ -515,7 +515,7 @@ function setActivePill(btn){
   if (lbRangeSel) {
   lbRangeSel.addEventListener('change', ()=>{
     const v = Number(lbRangeSel.value);
-    if (lbTitle) lbTitle.textContent = v === 0 ? 'Leaderboard (all time)' : 'Leaderboard (this week - Friday → Thursday)';
+    if (lbTitle) lbTitle.textContent = v === 0 ? 'Leaderboard (all time)' : 'Leaderboard (this week, Friday → Thursday)';
     renderLeaderboard();
   });
 }

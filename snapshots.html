@@ -51,7 +51,7 @@
         try {
           const res = await fetch('/api/snapshot_week?list=1', { headers: { 'x-snapshot-token': adminToken } });
           if (res.status === 401) {
-            showAuthMsg('Unauthorized token - try again.', true);
+            showAuthMsg('Unauthorized token, try again.', true);
             return;
           }
           const j = await res.json();
@@ -66,7 +66,7 @@
             li.className = 'list-item';
             const a = document.createElement('a');
             a.href = '#';
-            a.textContent = `${s.weekId} - ${new Date(s.ts).toUTCString()}`;
+            a.textContent = `${s.weekId}, ${new Date(s.ts).toUTCString()}`;
             a.addEventListener('click', (e)=>{ e.preventDefault(); loadSnapshot(s.weekId); });
             li.appendChild(a);
             ul.appendChild(li);
