@@ -425,12 +425,6 @@ async function renderWeeklyHero(){
   const hero = document.getElementById('weeklyHero');
   if(!hero) return;
 
-  // wire CTA buttons
-  const joinBtn = document.getElementById('joinWeeklyBtn');
-  const viewBtn = document.getElementById('viewWeeklyBtn');
-  joinBtn?.addEventListener('click', ()=>{ document.querySelector('.tab[data-tab="markets"]')?.click(); document.querySelector('.tab[data-tab="markets"]')?.dispatchEvent(new Event('click')); });
-  viewBtn?.addEventListener('click', ()=>{ document.querySelector('.tab[data-tab="leaderboard"]')?.click(); });
-
   // countdown
   const countdownEl = document.getElementById('weeklyCountdown');
   const endsLabel = document.getElementById('weeklyEndsLabel');
@@ -449,20 +443,7 @@ async function renderWeeklyHero(){
   updateCountdown();
   setInterval(updateCountdown, 1000);
 
-  // populate top 3 from weekly leaderboard (days=7)
-  try{
-    const rows = await fetchGlobalLeaderboard(7);
-    const list = document.getElementById('weeklyTop3');
-    if(!list) return;
-    list.innerHTML = [0,1,2].map(i=>{
-      const r = rows[i];
-      if(!r) return `<li class="empty">${i+1}. — <span class="muted">(No data)</span></li>`;
-      const addr = short(r.addr);
-      const pts = r.points ?? 0;
-      const prizeSplit = [25,15,10][i] || 0;
-      return `<li>${i+1}. <strong>${addr}</strong> <span class="muted">· ${pts} pts</span> <span style="float:right;font-weight:700">${prizeSplit ? '$'+prizeSplit : ''}</span></li>`;
-    }).join('');
-  }catch(e){ console.warn('weekly hero populate failed', e); }
+  // (Top-3 and CTAs removed per user request) only show countdown and prize split
 }
 async function renderLeaderboard(){
   const tbody = $("#lbBody");
