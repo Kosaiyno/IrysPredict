@@ -1248,7 +1248,8 @@ function setActivePill(btn){
       next.focus();
     } else if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
-      const btn = document.activeElement.closest('.seg-btn');
+      const activeEl = document.activeElement;
+      const btn = activeEl && typeof activeEl.closest === 'function' ? activeEl.closest('.seg-btn') : null;
       if (btn) setActivePill(btn);
     }
   });
