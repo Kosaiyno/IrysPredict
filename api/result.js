@@ -9,10 +9,23 @@ export async function processResult(body, kv) {
   // if no kv provided, dynamically import the real one (runtime use)
   if (!kv) {
     const mod = await import('./_kv.js');
-    kv = { kvSet: mod.kvSet, kvIncrBy: mod.kvIncrBy, kvZAdd: mod.kvZAdd };
+    kv = { kvSet: mod.kvSet, kvIncrBy: mod.kvIncrBy, kvZAdd: mod.kvZAdd, kvZRemRangeByRank: mod.kvZRemRangeByRank };
   }
-  const { kvSet: _kvSet, kvIncrBy: _kvIncrBy, kvZAdd: _kvZAdd } = kv;
-  const { wallet, roundId, asset, win, pointsDelta = 0, streak = 0, best = 0, ts = Date.now(), irysId } = body;
+  const { kvSet: _kvSet, kvIncrBy: _kvIncrBy, kvZAdd: _kvZAdd, kvZRemRangeByRank: _kvZRemRangeByRank } = kv;
+  const {
+    wallet,
+    roundId,
+    asset,
+    win,
+    pointsDelta = 0,
+    streak = 0,
+    best = 0,
+    ts = Date.now(),
+    irysId,
+    side = null,
+    priceAtBet = null,
+    priceAtClose = null
+  } = body;
   if (!wallet || typeof roundId !== 'number') throw new Error('Missing wallet/roundId');
 
   const w = wallet.toLowerCase();
@@ -40,6 +53,29 @@ export async function processResult(body, kv) {
   // maintain global sorted set by points
   const newPoints = Number(p?.result ?? 0);
   await _kvZAdd('lb:z:points', [{ score: newPoints, member: w }]).catch(()=>{});
+
+  // --- Per-wallet history (keep recent 100 entries, score = timestamp) ---
+  try {
+    const histKey = `lb:hist:${w}`;
+    const entry = {
+      wallet: w,
+      asset,
+      side,
+      roundId,
+      win,
+      delta: pointsDelta,
+      ts,
+      irysId: irysId || null,
+      priceAtBet: typeof priceAtBet === 'number' ? priceAtBet : null,
+      priceAtClose: typeof priceAtClose === 'number' ? priceAtClose : null
+    };
+    await _kvZAdd(histKey, [{ score: Number(ts), member: JSON.stringify(entry) }]).catch(()=>{});
+    if (_kvZRemRangeByRank) {
+      await _kvZRemRangeByRank(histKey, 0, -101).catch(()=>{});
+    }
+  } catch (e) {
+    // ignore history errors
+  }
 
   // --- Weekly (Friday-aligned) scoped stats ---
   try {

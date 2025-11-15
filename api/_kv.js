@@ -61,3 +61,7 @@ export function kvZRange(key, start, stop, withScores = false) {
   if (withScores) args.push("WITHSCORES");
   return callPath(args);
 }
+
+export function kvZRemRangeByRank(key, start, stop) {
+  return callPath(["zremrangebyrank", key, String(start), String(stop)]);
+}

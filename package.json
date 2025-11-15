@@ -7,13 +7,15 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview --open"
-    ,"snapshot:fetch":"node scripts/fetch_snapshot.mjs"
+    ,"snapshot:fetch":"node scripts/fetch_snapshot.mjs",
+    "reward:sign": "node scripts/issue_reward_signature.mjs"
   },
   "dependencies": {
     "@irys/web-upload": "latest",
     "@irys/web-upload-ethereum": "latest",
     "@irys/web-upload-ethereum-ethers-v6": "latest",
     "ethers": "^6.13.2",
+    "dotenv": "^16.4.5",
     "axios": "^1.7.4",
     "chart.js": "^4.4.3"
   },

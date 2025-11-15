@@ -30,6 +30,20 @@ function createMockKV() {
       }
       return { result: 'OK' };
     },
+    async kvZRemRangeByRank(key, start, stop) {
+      const map = zsets.get(key) || new Map();
+      const arr = [...map.entries()].map(([member, score])=>({ member, score }));
+      arr.sort((a,b)=> a.score - b.score);
+      const getIndex = (i)=> i < 0 ? arr.length + i : i;
+      const s = Math.max(0, getIndex(start));
+      const e = Math.min(arr.length - 1, getIndex(stop));
+      if (s > e) return { result: 0 };
+      for (let i = s; i <= e; i++) {
+        const item = arr[i];
+        map.delete(item.member);
+      }
+      return { result: e - s + 1 };
+    },
     async kvZRange(key, start, stop, withScores = false) {
       const map = zsets.get(key) || new Map();
       const arr = [...map.entries()].map(([member, score])=>({ member, score }));
@@ -54,7 +68,7 @@ function createMockKV() {
 (async function test() {
   const mock = createMockKV();
   // Inject mock into wrappers expected by processResult and getLeaderboard
-  const kvFuncsForProcess = { kvSet: mock.kvSet, kvIncrBy: mock.kvIncrBy, kvZAdd: mock.kvZAdd };
+  const kvFuncsForProcess = { kvSet: mock.kvSet, kvIncrBy: mock.kvIncrBy, kvZAdd: mock.kvZAdd, kvZRemRangeByRank: mock.kvZRemRangeByRank };
   const kvFuncsForLeaderboard = { kvGet: mock.kvGet, kvZRange: mock.kvZRange };
 
   const now = Date.now();

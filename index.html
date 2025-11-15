@@ -18,40 +18,24 @@
      </h1>
 
   <div class="spacer"></div>
-  <button id="themeBtn" class="pill" type="button">Dark mode</button>
   <button id="pointsInfoBtn" class="pill" type="button">How points work</button>
-  <button id="walletBtn" class="btn mint" type="button">Connect Wallet</button>
-    </header>
-
-    <!-- Weekly Competition Hero (pinned) -->
-    <div id="weeklyHero" class="weekly-hero" role="region" aria-label="Weekly competition" data-prize="50">
-      <div class="weekly-inner">
-        <div class="left">
-          <h3>Weekly Showdown, Top 3 share prize pool of $50</h3>
-          <p class="tagline">Juicy prizes. Fierce leaderboard. New week starts every Friday, climb the ranks and grab your share.</p>
-          <div class="prize-split">
-            <div class="p1"><span class="amt">$25</span><small>1st</small></div>
-            <div class="p2"><span class="amt">$15</span><small>2nd</small></div>
-            <div class="p3"><span class="amt">$10</span><small>3rd</small></div>
-          </div>
-        </div>
-        <div class="right">
-          <div class="countdown-box">
-            <small class="muted">Week ends</small>
-            <div id="weeklyCountdown" class="countdown-large">--:--:--:--</div>
-            <small id="weeklyEndsLabel" class="muted">Thu · 23:59 UTC</small>
-          </div>
-        </div>
-      </div>
+  <div class="wallet-controls">
+    <button id="walletBtn" class="btn mint" type="button">Connect Wallet</button>
+    <div id="walletProfile" class="wallet-profile" hidden>
+      <span id="walletAddressLabel" class="wallet-address"></span>
+  <button id="walletDisconnectBtn" class="btn ghost wallet-disconnect" type="button" hidden>Disconnect</button>
     </div>
+  </div>
+    </header>
 
     <nav class="tabs">
       <button class="tab active" data-tab="markets" type="button">Markets</button>
       <button class="tab" data-tab="leaderboard" type="button">Leaderboard</button>
+      <button class="tab" data-tab="history" type="button">History</button>
     </nav>
 
-    <!-- Intro -->
-    <section class="intro">
+  <!-- Intro -->
+  <section class="intro" id="intro">
       <h2>Welcome to IrysPredict</h2>
       <p>
         IrysPredict is a simple prediction game built on Irys.
@@ -86,6 +70,7 @@
               <button class="btn up betBtn" data-side="UP" type="button">UP</button>
               <button class="btn down betBtn" data-side="DOWN" type="button">DOWN</button>
             </div>
+            <div class="card-status" role="status" aria-live="polite"></div>
           </div>
 
           <!-- ETH -->
@@ -106,6 +91,7 @@
               <button class="btn up betBtn" data-side="UP" type="button">UP</button>
               <button class="btn down betBtn" data-side="DOWN" type="button">DOWN</button>
             </div>
+            <div class="card-status" role="status" aria-live="polite"></div>
           </div>
         </div>
 
@@ -164,6 +150,19 @@
           </table>
         </div>
         <!-- (Removed the extra "How points work" button that was below the table) -->
+      </section>
+
+      <!-- History -->
+      <section id="history" class="tabpane" aria-label="History">
+        <div class="history-head">
+          <h2>Your History</h2>
+          <div class="history-actions">
+            <button class="btn ghost" id="historyRefreshBtn" type="button">Refresh</button>
+          </div>
+        </div>
+        <div id="historyBody" class="history-body">
+          <p class="muted">Connect your wallet to view past predictions.</p>
+        </div>
       </section>
     </main>
 
