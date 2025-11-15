@@ -319,14 +319,21 @@ const MAX_STAKE_RECORDS_PER_WALLET = 64;
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const REWARD_POOL_ADDRESS = (() => {
-  if (typeof window !== "undefined") {
-    const candidate = window.IRYS_REWARD_POOL_ADDRESS || window.REWARD_POOL_ADDRESS;
-    if (typeof candidate === "string" && candidate) {
-      try {
-        return ethers.getAddress(candidate);
-      } catch {
-        console.warn("Invalid reward pool address configured:", candidate);
-      }
+  let candidate;
+  try {
+    const envCandidate = typeof import.meta !== "undefined" ? import.meta.env?.VITE_REWARD_POOL_ADDRESS : undefined;
+    if (envCandidate) candidate = envCandidate;
+  } catch {
+    // ignore env access issues
+  }
+  if (!candidate && typeof window !== "undefined") {
+    candidate = window.IRYS_REWARD_POOL_ADDRESS || window.REWARD_POOL_ADDRESS;
+  }
+  if (typeof candidate === "string" && candidate) {
+    try {
+      return ethers.getAddress(candidate);
+    } catch {
+      console.warn("Invalid reward pool address configured:", candidate);
     }
   }
   return ZERO_ADDRESS;
