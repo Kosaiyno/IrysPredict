@@ -348,6 +348,25 @@ const REWARD_POOL_ABI = [
 
 const defaultAbiCoder = ethers.AbiCoder.defaultAbiCoder();
 
+let rewardPoolDeploymentCheck = null;
+
+async function ensureRewardPoolDeployed(provider) {
+  if (!provider) throw new Error("Wallet provider unavailable");
+  if (!rewardPoolDeploymentCheck) {
+    rewardPoolDeploymentCheck = (async () => {
+      const code = await provider.getCode(REWARD_POOL_ADDRESS);
+      if (!code || code === "0x") {
+        throw new Error("Reward pool contract not found on this network. Switch to Irys Testnet and try again.");
+      }
+      return code;
+    })().catch((err) => {
+      rewardPoolDeploymentCheck = null;
+      throw err;
+    });
+  }
+  return rewardPoolDeploymentCheck;
+}
+
 function normalizeWallet(value) {
   if (typeof value !== "string") return "";
   return value.trim().toLowerCase();
@@ -444,6 +463,9 @@ function getRewardPoolContract(signerOrProvider) {
 
 async function ensureRewardStake({ signer, roundId, asset, side, card }) {
   if (!signer) throw new Error("Signer unavailable for reward pool entry");
+
+  const provider = signer.provider || providerRef;
+  await ensureRewardPoolDeployed(provider);
 
   const betKey = computeBetKey(roundId, walletAddress, asset, side);
    const cached = getStakeEntry(walletAddress, betKey);
@@ -560,6 +582,8 @@ async function initiateRewardClaim({ card, roundId, asset, side, betKey, resultC
 
     clearCardStatus(card);
     const contract = getRewardPoolContract(signer);
+    const provider = signer.provider || providerRef;
+    await ensureRewardPoolDeployed(provider);
     const roundArg = typeof roundId === "bigint"
       ? roundId
       : BigInt(Math.floor(Number(roundId) || 0));
