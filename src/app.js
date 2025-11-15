@@ -1249,7 +1249,7 @@ function setActivePill(btn){
     } else if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       const activeEl = document.activeElement;
-      const btn = activeEl && typeof activeEl.closest === 'function' ? activeEl.closest('.seg-btn') : null;
+      const btn = activeEl && activeEl instanceof Element && activeEl.matches('.seg-btn') ? activeEl : null;
       if (btn) setActivePill(btn);
     }
   });
