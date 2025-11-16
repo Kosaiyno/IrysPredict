@@ -487,6 +487,12 @@ const STAKE_LEDGER_KEY  = "reward_pool_stakes_v1";   // { [wallet]: { [betKey]: 
 const ENTRY_FEE_IRYS = 0.1;
 const ENTRY_FEE_WEI = ethers.parseEther("0.1");
 const MAX_STAKE_RECORDS_PER_WALLET = 64;
+const ENTRY_FEE_CACHE_TTL_MS = 20_000;
+let cachedEntryFee = {
+  wei: ENTRY_FEE_WEI,
+  irys: ENTRY_FEE_IRYS,
+  fetchedAt: 0,
+};
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const REWARD_POOL_ADDRESS = (() => {
@@ -523,6 +529,26 @@ function resolvePayoutIrys(value) {
   const num = Number(value);
   const fallback = ENTRY_FEE_IRYS * 2;
   return Number.isFinite(num) && num > 0 ? num : fallback;
+}
+
+async function loadEntryFee(contract) {
+  const now = Date.now();
+  if (now - cachedEntryFee.fetchedAt < ENTRY_FEE_CACHE_TTL_MS) {
+    return cachedEntryFee;
+  }
+  try {
+    const feeWei = await contract.ENTRY_FEE_WEI();
+    if (feeWei) {
+      cachedEntryFee = {
+        wei: feeWei,
+        irys: Number(ethers.formatEther(feeWei)),
+        fetchedAt: now,
+      };
+    }
+  } catch {
+    cachedEntryFee = { wei: ENTRY_FEE_WEI, irys: ENTRY_FEE_IRYS, fetchedAt: now };
+  }
+  return cachedEntryFee;
 }
 
 let rewardPoolDeploymentCheck = null;
@@ -646,23 +672,19 @@ async function ensureRewardStake({ signer, roundId, asset, side, card }) {
 
   const betKey = computeBetKey(roundId, walletAddress, asset, side);
    const cached = getStakeEntry(walletAddress, betKey);
-  if (cached) return cached;
+  if (cached?.confirmed) return cached;
 
   const contract = getRewardPoolContract(signer);
-  let entryFeeWei = ENTRY_FEE_WEI;
-  let entryFeeIrys = ENTRY_FEE_IRYS;
-  try {
-    const onchainFee = await contract.ENTRY_FEE_WEI();
-    if (onchainFee) {
-      entryFeeWei = onchainFee;
-      entryFeeIrys = Number(ethers.formatEther(onchainFee));
-    }
-  } catch {
-    // ignore and use fallback fee
-  }
+  const [entryFeeData, alreadyPaid] = await Promise.all([
+    loadEntryFee(contract),
+    contract.hasBet(roundId, walletAddress, asset, side).catch(() => false),
+  ]);
+
+  const entryFeeWei = entryFeeData?.wei ?? ENTRY_FEE_WEI;
+  const entryFeeIrys = entryFeeData?.irys ?? ENTRY_FEE_IRYS;
+
   const entryFeeLabel = formatStakeAmount(entryFeeIrys);
 
-  const alreadyPaid = await contract.hasBet(roundId, walletAddress, asset, side);
   if (alreadyPaid) {
     const entry = {
       wallet: walletAddress,
@@ -680,7 +702,7 @@ async function ensureRewardStake({ signer, roundId, asset, side, card }) {
     return entry;
   }
 
-  setCardStatus(card, `Confirm the ${entryFeeLabel} IRYS entry fee…`, "loading");
+  setCardStatus(card, `Sign for ${entryFeeLabel} IRYS entry…`, "loading");
   const tx = await contract.placeBet(roundId, asset, side, { value: entryFeeWei });
   setCardStatus(card, "Waiting for entry confirmation…", "loading");
   const receipt = await tx.wait();
@@ -826,6 +848,7 @@ let irys = null;
 let walletAddress = null;
 let providerRef = null;
 let signerRef = null;
+let walletInitPromise = null;
 
 const walletBtn = $("#walletBtn");
 const walletProfile = $("#walletProfile");
@@ -936,28 +959,65 @@ if (dykText && dykLink){ renderDYK(); restartDYKTimer(); }
 
 // ====== Wallet/Irys helpers ======
 async function ensureWallet() {
-  if (!window.ethereum) { alert("No EVM wallet found. Please install MetaMask (or a compatible wallet)."); throw new Error("No wallet"); }
+  if (walletAddress && providerRef && signerRef) {
+    return { provider: providerRef, signer: signerRef, address: walletAddress };
+  }
+  if (!walletInitPromise) {
+    walletInitPromise = connectWallet().catch((err) => {
+      walletInitPromise = null;
+      throw err;
+    });
+  }
+  const result = await walletInitPromise;
+  walletInitPromise = null;
+  return result;
+}
+
+async function connectWallet() {
+  if (!window.ethereum) {
+    alert("No EVM wallet found. Please install MetaMask (or a compatible wallet).");
+    throw new Error("No wallet");
+  }
 
   const { ethereum } = window;
 
-  const requestProvider = new ethers.BrowserProvider(ethereum);
-  await requestProvider.send("eth_requestAccounts", []);
+  const accountRequest = ethereum.request({ method: "eth_requestAccounts" });
+  const chainRequest = ethereum.request({ method: "eth_chainId" }).catch(() => null);
+  const [accounts, currentChain] = await Promise.all([accountRequest, chainRequest]);
 
-  await ensureIrysChain();
+  if (!Array.isArray(accounts) || accounts.length === 0) {
+    throw new Error("Wallet connection rejected");
+  }
+  let primaryAccount;
+  try {
+    primaryAccount = ethers.getAddress(accounts[0]);
+  } catch {
+    primaryAccount = accounts[0];
+  }
 
-  providerRef = new ethers.BrowserProvider(ethereum);
+  if (currentChain !== IRYS_CHAIN_ID_HEX) {
+    await ensureIrysChain();
+  }
+
+  providerRef = new ethers.BrowserProvider(ethereum, "any");
   const network = await providerRef.getNetwork();
   if (Number(network?.chainId) !== IRYS_CHAIN_ID_DEC) {
     throw new Error("Please switch to the Irys Testnet network to continue.");
   }
 
   signerRef = await providerRef.getSigner();
-  walletAddress = await signerRef.getAddress();
-  window.connectedWallet = walletAddress;
-  localStorage.setItem(LAST_WALLET_KEY, walletAddress);
+  const addr = await signerRef.getAddress().catch(() => primaryAccount);
+  if (!addr) {
+    throw new Error("Wallet address unavailable");
+  }
+  walletAddress = addr;
+  window.connectedWallet = addr;
+  localStorage.setItem(LAST_WALLET_KEY, addr);
+
   updateWalletUi();
   renderHistory();
   renderMyOpenBetsForCurrentRound();
+
   return { provider: providerRef, signer: signerRef, address: walletAddress };
 }
 async function ensureIrys() {
@@ -1225,7 +1285,7 @@ $$(".betBtn").forEach((btn)=>
 
       const { signer } = await ensureWallet();
 
-      setCardStatus(card, `Processing ${formatStakeAmount(ENTRY_FEE_IRYS)} IRYS entry fee…`, "loading");
+      setCardStatus(card, `Requesting ${formatStakeAmount(ENTRY_FEE_IRYS)} IRYS entry signature…`, "loading");
 
       // avoid duplicate bet on same asset in current round
       const existing = loadOpenBetsForRound(currentRoundId).find(b =>
@@ -1241,7 +1301,7 @@ $$(".betBtn").forEach((btn)=>
       // disable both buttons on that card
       card?.querySelectorAll(".betBtn")?.forEach((b)=> b.disabled = true);
 
-      const uploader = await ensureIrys();
+      const uploaderPromise = ensureIrys();
 
       const stake = await ensureRewardStake({
         signer,
@@ -1251,6 +1311,7 @@ $$(".betBtn").forEach((btn)=>
         card,
       });
 
+      const uploader = await uploaderPromise;
       setCardStatus(card, "Uploading bet…", "loading");
       const ts = Date.now() + serverOffsetMs;
       const payload = {

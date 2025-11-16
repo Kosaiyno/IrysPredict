@@ -50,8 +50,13 @@ export async function processResult(body, kv) {
   await _kvSet(`${base}:best`,   String(best),   { ex: WINDOW_SEC }).catch(()=>{});
   await _kvSet(`${base}:lastRec`, { roundId, asset, win, pointsDelta, ts, irysId }, { ex: WINDOW_SEC }).catch(()=>{});
 
-  // maintain global sorted set by points
-  const newPoints = Number(p?.result ?? 0);
+  // maintain global sorted set by points with a zero floor
+  let newPoints = Number(p?.result ?? 0);
+  if (!Number.isFinite(newPoints)) newPoints = 0;
+  if (newPoints < 0) {
+    newPoints = 0;
+    await _kvSet(pointsKey, String(newPoints)).catch(()=>{});
+  }
   await _kvZAdd('lb:z:points', [{ score: newPoints, member: w }]).catch(()=>{});
 
   // --- Per-wallet history (keep recent 100 entries, score = timestamp) ---
@@ -110,7 +115,12 @@ export async function processResult(body, kv) {
     await _kvSet(wStreakKey, String(streak), { ex: 7 * 24 * 60 * 60 }).catch(()=>{});
     await _kvSet(wBestKey,   String(best),   { ex: 7 * 24 * 60 * 60 }).catch(()=>{});
 
-    const newWeekPoints = Number(wp?.result ?? 0);
+    let newWeekPoints = Number(wp?.result ?? 0);
+    if (!Number.isFinite(newWeekPoints)) newWeekPoints = 0;
+    if (newWeekPoints < 0) {
+      newWeekPoints = 0;
+      await _kvSet(wPointsKey, String(newWeekPoints)).catch(()=>{});
+    }
     await _kvZAdd(wZKey, [{ score: newWeekPoints, member: w }]).catch(()=>{});
   } catch(e) {
     // swallow weekly errors to avoid breaking the main flow
