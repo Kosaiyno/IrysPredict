@@ -47,6 +47,15 @@ function clearAllCardStatuses() {
   $$(".card").forEach((card) => clearCardStatus(card));
 }
 
+function setResultStatus(target, message, state = "info") {
+  if (!target) return;
+  target.className = "result-status";
+  if (state === "success") target.classList.add("is-success");
+  else if (state === "error") target.classList.add("is-error");
+  else if (state === "loading") target.classList.add("is-loading");
+  target.textContent = message;
+}
+
 const formatPoints = (delta) => {
   if (typeof delta !== "number" || Number.isNaN(delta)) return "0 pts";
   const sign = delta > 0 ? "+" : "";
@@ -153,6 +162,78 @@ function showBetResults(results = []) {
     .forEach((res) => showBetOutcomeMessage(res));
 }
 
+const roundResultQueue = [];
+let currentModalResults = null;
+let isRoundResultModalOpen = false;
+
+function buildRoundResultItemMarkup(result, index) {
+  const payoutLabel = formatStakeAmount(result.payoutIrys);
+  const locked = typeof result.priceStart === "number" ? fmtUsd(result.priceStart, 4) : "$--";
+  const settled = typeof result.priceEnd === "number" ? fmtUsd(result.priceEnd, 4) : "$--";
+  const outcomeText = result.win
+    ? `You won ${formatPoints(result.delta)}.`
+    : `You lost ${formatPoints(result.delta)}.`;
+  const statusMessage = result.win ? "Reward ready to claim." : "Better luck next round.";
+  const roundLabel = typeof result.roundId === "bigint" ? Number(result.roundId) : result.roundId;
+
+  return `
+    <article class="round-result-item ${result.win ? "win" : "loss"}" data-index="${index}">
+      <div class="result-head">
+        <strong>${result.asset} · ${result.side}</strong>
+        <small>Round ${roundLabel}</small>
+      </div>
+      <p class="result-summary">${outcomeText}</p>
+      <small class="result-prices">Locked at ${locked} · Settled at ${settled}</small>
+      <div class="result-actions">
+        ${result.win ? `<button class="btn mint modal-claim-btn" data-index="${index}">Claim ${payoutLabel} IRYS</button>` : ""}
+        <div class="result-status">${statusMessage}</div>
+      </div>
+    </article>
+  `;
+}
+
+function showNextRoundResultModal() {
+  if (isRoundResultModalOpen) return;
+  const next = roundResultQueue.shift();
+  if (!next) return;
+  const modal = $("#roundResultModal");
+  const body = $("#roundResultBody");
+  if (!modal || !body) return;
+  currentModalResults = next;
+  body.innerHTML = next.map((entry, idx) => buildRoundResultItemMarkup(entry, idx)).join("\n");
+  isRoundResultModalOpen = true;
+  modal.showModal();
+}
+
+function enqueueRoundResults(results) {
+  const wallet = getDisplayWalletAddress();
+  if (!wallet) return;
+  const lower = wallet.toLowerCase();
+  const mine = results
+    .filter((r) => (r.wallet || "").toLowerCase() === lower)
+    .map((r) => ({
+      ...r,
+      payoutIrys: resolvePayoutIrys(r.suggestedPayoutIrys),
+      claimed: Boolean(r.claimed),
+    }));
+  if (!mine.length) return;
+  roundResultQueue.push(mine);
+  showNextRoundResultModal();
+}
+
+function closeRoundResultModal() {
+  const modal = $("#roundResultModal");
+  if (modal?.open) modal.close();
+  currentModalResults = null;
+  isRoundResultModalOpen = false;
+  showNextRoundResultModal();
+}
+
+function markModalResultClaimed(index) {
+  if (!currentModalResults || !currentModalResults[index]) return;
+  currentModalResults[index].claimed = true;
+}
+
 const leaderboardCache = {
   ttlMs: 30_000,
   entries: new Map(),
@@ -233,10 +314,17 @@ const formatResolvedTs = (ts) => {
   return new Date(num).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 };
 
-let historyCache = { wallet: null, entries: [], loading: false };
+const historyEntryKey = (entry, betKey) => {
+  if (betKey) return String(betKey).toLowerCase();
+  const round = typeof entry.roundId === "bigint" ? Number(entry.roundId) : entry.roundId;
+  return [round, entry.asset, entry.side].map((val) => (val || "").toString().toLowerCase()).join(":");
+};
+
+let historyCache = { wallet: null, entries: [], loading: false, shouldRefetch: true };
 function invalidateHistoryCache() {
   historyCache.entries = [];
   historyCache.loading = false;
+  historyCache.shouldRefetch = true;
 }
 
 async function renderHistory(){
@@ -245,40 +333,60 @@ async function renderHistory(){
   const wallet = getDisplayWalletAddress();
   if (!wallet){
     container.innerHTML = '<p class="history-empty">Connect your wallet to view past predictions.</p>';
-    historyCache = { wallet: null, entries: [], loading: false };
+    historyCache = { wallet: null, entries: [], loading: false, shouldRefetch: true };
     return;
   }
 
-  if (historyCache.wallet !== wallet.toLowerCase()) {
-    historyCache = { wallet: wallet.toLowerCase(), entries: [], loading: false };
-  }
-
-  const needsFetch = historyCache.entries.length === 0;
-
-  if (needsFetch && !historyCache.loading) {
-    container.innerHTML = '<p class="history-empty">Loading history…</p>';
-    historyCache.loading = true;
-    try {
-      const res = await fetch(`/api/history?wallet=${encodeURIComponent(wallet)}`);
-      if (!res.ok) throw new Error('history failed');
-      const data = await res.json();
-      historyCache.entries = Array.isArray(data?.entries) ? data.entries : [];
-    } catch (err) {
-      container.innerHTML = '<p class="history-empty">History unavailable right now.</p>';
-      historyCache.loading = false;
-      return;
-    } finally {
-      historyCache.loading = false;
-    }
+  const normalizedWallet = wallet.toLowerCase();
+  if (historyCache.wallet !== normalizedWallet) {
+    historyCache = { wallet: normalizedWallet, entries: [], loading: false, shouldRefetch: true };
   }
 
   const entries = historyCache.entries;
-  if (!entries.length){
+  const hasEntries = Array.isArray(entries) && entries.length > 0;
+  if (hasEntries) {
+    container.innerHTML = renderHistoryEntriesHtml(entries);
+  }
+
+  const shouldFetch = historyCache.shouldRefetch && !historyCache.loading;
+  if (!shouldFetch) {
+    if (!hasEntries) {
+      container.innerHTML = '<p class="history-empty">No predictions yet. Make your first call!</p>';
+    }
+    return;
+  }
+
+  if (!hasEntries) {
+    container.innerHTML = '<p class="history-empty">Loading history…</p>';
+  }
+
+  historyCache.loading = true;
+  try {
+    const res = await fetch(`/api/history?wallet=${encodeURIComponent(wallet)}`);
+    if (!res.ok) throw new Error('history failed');
+    const data = await res.json();
+    historyCache.entries = Array.isArray(data?.entries) ? data.entries : [];
+    historyCache.shouldRefetch = false;
+  } catch (err) {
+    if (!hasEntries) {
+      container.innerHTML = '<p class="history-empty">History unavailable right now.</p>';
+    }
+    historyCache.loading = false;
+    return;
+  }
+
+  historyCache.loading = false;
+  const fresh = historyCache.entries;
+  if (!Array.isArray(fresh) || fresh.length === 0) {
     container.innerHTML = '<p class="history-empty">No predictions yet. Make your first call!</p>';
     return;
   }
 
-  const html = entries.map((entry)=>{
+  container.innerHTML = renderHistoryEntriesHtml(fresh);
+}
+
+function renderHistoryEntriesHtml(entries) {
+  return entries.map((entry)=>{
     const win = !!entry.win;
     const outcome = win ? "Won" : "Lost";
     const deltaStr = typeof entry.delta === "number" ? formatPoints(entry.delta) : "";
@@ -303,7 +411,49 @@ async function renderHistory(){
         </div>
       </article>`;
   }).join("");
-  container.innerHTML = html;
+}
+
+function primeHistoryFromResults(results = []) {
+  if (!Array.isArray(results) || results.length === 0) return;
+  const wallet = getDisplayWalletAddress();
+  if (!wallet) return;
+  const normalizedWallet = wallet.toLowerCase();
+  const mine = results.filter((r) => !r.pending && (r.wallet || "").toLowerCase() === normalizedWallet);
+  if (!mine.length) return;
+
+  if (historyCache.wallet !== normalizedWallet) {
+    historyCache = { wallet: normalizedWallet, entries: [], loading: false, shouldRefetch: true };
+  }
+
+  const existing = Array.isArray(historyCache.entries) ? historyCache.entries : [];
+  const seen = new Set(existing.map((entry) => historyEntryKey(entry)));
+  const additions = [];
+
+  mine.forEach((res) => {
+    const entry = {
+      wallet: normalizedWallet,
+      asset: res.asset,
+      side: res.side,
+      roundId: typeof res.roundId === "bigint" ? Number(res.roundId) : res.roundId,
+      win: !!res.win,
+      delta: res.delta,
+      ts: res.resolvedTs ?? res.ts ?? Date.now(),
+      irysId: res.irysId || null,
+      priceAtBet: typeof res.priceStart === "number" ? res.priceStart : res.priceAtBet ?? null,
+      priceAtClose: typeof res.priceEnd === "number" ? res.priceEnd : res.priceAtClose ?? null,
+    };
+    const key = historyEntryKey(entry, res.betKey);
+    if (seen.has(key)) return;
+    seen.add(key);
+    additions.push(entry);
+  });
+
+  if (!additions.length) return;
+
+  historyCache.entries = [...additions, ...existing].slice(0, 100);
+  historyCache.shouldRefetch = true;
+  historyCache.loading = false;
+  renderHistory();
 }
 
 // ====== Keys ======
@@ -347,6 +497,11 @@ const REWARD_POOL_ABI = [
 ];
 
 const defaultAbiCoder = ethers.AbiCoder.defaultAbiCoder();
+
+function resolvePayoutIrys(value) {
+  const num = Number(value);
+  return Number.isFinite(num) && num > 0 ? num : ENTRY_FEE_IRYS;
+}
 
 let rewardPoolDeploymentCheck = null;
 
@@ -525,13 +680,14 @@ async function ensureRewardStake({ signer, roundId, asset, side, card }) {
   return stakeEntry;
 }
 
-async function initiateRewardClaim({ card, roundId, asset, side, betKey, resultContainer, suggestedPayoutIrys }) {
-  if (!card) return;
+async function initiateRewardClaim({ card, roundId, asset, side, betKey, resultContainer, suggestedPayoutIrys, statusTarget }) {
   try {
     setCardStatus(card, "Preparing reward claim…", "loading");
+    setResultStatus(statusTarget, "Preparing reward claim…", "loading");
     const { signer, address } = await ensureWallet();
 
     setCardStatus(card, "Fetching reward signature…", "loading");
+    setResultStatus(statusTarget, "Fetching reward signature…", "loading");
 
     let resolvedBetKey = betKey;
     if (!resolvedBetKey) {
@@ -589,8 +745,10 @@ async function initiateRewardClaim({ card, roundId, asset, side, betKey, resultC
       : BigInt(Math.floor(Number(roundId) || 0));
 
     setCardStatus(card, "Submitting reward claim…", "loading");
+    setResultStatus(statusTarget, "Submitting reward claim…", "loading");
     const tx = await contract.claimReward(roundArg, asset, side, payoutWei, signature);
     setCardStatus(card, "Waiting for claim confirmation…", "loading");
+    setResultStatus(statusTarget, "Waiting for claim confirmation…", "loading");
     const receipt = await tx.wait();
     const txHash = receipt?.hash || tx?.hash || null;
 
@@ -609,9 +767,13 @@ async function initiateRewardClaim({ card, roundId, asset, side, betKey, resultC
     }
 
     setCardStatus(card, "Reward claimed! Funds should arrive shortly.", "success");
+    setResultStatus(statusTarget, `✅ Reward claimed! ${payoutDisplay} IRYS sent.`, "success");
+    return true;
   } catch (err) {
     console.error("Reward claim failed", err);
     setCardStatus(card, err?.message || "Reward claim failed", "error");
+    setResultStatus(statusTarget, err?.message || "Reward claim failed", "error");
+    return false;
   }
 }
 
@@ -829,6 +991,49 @@ walletBtn?.addEventListener("click", async (event)=>{
   }
 });
 
+const roundResultModal = $("#roundResultModal");
+roundResultModal?.addEventListener("cancel", (event) => {
+  event.preventDefault();
+});
+
+$("#roundResultCloseBtn")?.addEventListener("click", () => {
+  closeRoundResultModal();
+});
+
+roundResultModal?.addEventListener("click", async (event) => {
+  const btn = event.target.closest?.(".modal-claim-btn");
+  if (!btn) return;
+  event.preventDefault();
+  const index = Number(btn.dataset.index);
+  if (!currentModalResults || Number.isNaN(index)) return;
+  const entry = currentModalResults[index];
+  if (!entry) return;
+  const statusEl = btn.parentElement?.querySelector(".result-status");
+  const originalLabel = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Claiming…";
+  const card = document.querySelector(`[data-asset='${entry.asset}']`);
+  const resultContainer = card?.querySelector(".active-bet .bet-result") || null;
+  const success = await initiateRewardClaim({
+    card: card || null,
+    roundId: entry.roundId,
+    asset: entry.asset,
+    side: entry.side,
+    betKey: entry.betKey,
+    resultContainer,
+    suggestedPayoutIrys: entry.payoutIrys,
+    statusTarget: statusEl,
+  });
+  if (success) {
+    markModalResultClaimed(index);
+    btn.remove();
+    setResultStatus(statusEl, `✅ Reward claimed! ${formatStakeAmount(entry.payoutIrys)} IRYS sent.`, "success");
+  } else {
+    btn.disabled = false;
+    btn.textContent = originalLabel || "Claim";
+  }
+});
+
 // ====== Round persistence ======
 function loadRoundState(){ try { return JSON.parse(localStorage.getItem(ROUND_STATE_KEY) || "null"); } catch { return null; } }
 function saveRoundState(state){ localStorage.setItem(ROUND_STATE_KEY, JSON.stringify(state)); }
@@ -837,21 +1042,6 @@ function initRoundFromStorageOrNew(){
   const now = Date.now() + serverOffsetMs;
   if (saved && now < saved.endTs) { currentRoundId = saved.roundId; roundEndTime = saved.endTs; }
   else { startNewRound(); }
-}
-function showRoundModal(){
-  const roundModal = $("#roundModal");
-  const roundCountdownEl = $("#roundCountdown");
-  const startRoundBtn = $("#startRoundBtn");
-  if(!roundModal || !roundCountdownEl){ startNewRound(); return; }
-  let countdown = 5;
-  roundCountdownEl.textContent = `0:0${countdown}`;
-  roundModal.showModal();
-  const interval = setInterval(()=>{
-    countdown--;
-    roundCountdownEl.textContent = `0:0${Math.max(countdown,0)}`;
-    if(countdown<=0){ clearInterval(interval); roundModal.close(); startNewRound(); }
-  },1000);
-  startRoundBtn.onclick = ()=>{ clearInterval(interval); roundModal.close(); startNewRound(); };
 }
 function startNewRound(){
   const now = Date.now() + serverOffsetMs;
@@ -867,12 +1057,14 @@ function startNewRound(){
 async function endRound(){
   if (resolvingRound) return;
   resolvingRound = true;
+  const finishedRoundId = currentRoundId;
   try {
     const results = await resolveOpenBets();
     showBetResults(results);
+    enqueueRoundResults(results);
   } finally {
-    clearOpenBetsForRound(currentRoundId);
-    showRoundModal();
+    clearOpenBetsForRound(finishedRoundId);
+    startNewRound();
   }
 }
 function renderCountdown(ms){ const mins = Math.floor(ms / 60000); const secs = Math.floor((ms % 60000) / 1000); return `${mins}:${secs.toString().padStart(2,"0")}`; }
@@ -1193,8 +1385,9 @@ async function resolveOpenBets(){
     }
   }
 
-  renderLeaderboard({ force: true });
   invalidateHistoryCache();
+  primeHistoryFromResults(results);
+  renderLeaderboard({ force: true });
   renderHistory();
   return results;
 }
