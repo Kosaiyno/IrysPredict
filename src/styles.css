@@ -402,6 +402,32 @@ h3{margin:0 0 6px 0;font-size:16px;letter-spacing:.02em}
   background:var(--panel);border:1px solid var(--border);padding:18px;border-radius:10px;
   min-width:320px;max-width:560px;color:var(--text);
 }
+.modal-actions{display:flex;justify-content:flex-end;gap:12px;margin-top:18px}
+.round-result-box{max-width:600px}
+.round-result-body{display:flex;flex-direction:column;gap:12px;margin:14px 0 18px;max-height:60vh;overflow-y:auto;padding-right:6px}
+.round-result-item{
+  border:1px solid rgba(39,245,207,.18);
+  border-radius:14px;
+  padding:14px;
+  background:linear-gradient(145deg,rgba(16,25,36,.92),rgba(8,13,20,.82));
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  box-shadow:0 18px 32px rgba(0,0,0,.4);
+}
+.round-result-item.win{border-color:rgba(25,195,125,.4)}
+.round-result-item.loss{border-color:rgba(255,106,123,.35)}
+.round-result-item .result-head{display:flex;justify-content:space-between;align-items:center;font-size:14px}
+.round-result-item .result-summary{margin:0;font-weight:600;font-size:14px}
+.round-result-item.win .result-summary{color:var(--up)}
+.round-result-item.loss .result-summary{color:var(--down)}
+.round-result-item .result-prices{color:var(--muted);display:block}
+.round-result-item .result-actions{display:flex;flex-direction:column;gap:8px}
+.round-result-item .modal-claim-btn{align-self:flex-start}
+.result-status{font-size:13px;color:var(--muted);min-height:18px}
+.result-status.is-success{color:var(--up)}
+.result-status.is-error{color:var(--down)}
+.result-status.is-loading{color:var(--muted)}
 .label{display:block;margin:10px 0 6px}
 .textarea{
   width:100%;min-height:100px;background:transparent;border:1px solid var(--border);

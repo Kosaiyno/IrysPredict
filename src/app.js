@@ -88,6 +88,8 @@ function showBetOutcomeMessage({ asset, win, delta, pending, roundId, side, betK
   }
 
   if (win) {
+    const payoutAmount = resolvePayoutIrys(suggestedPayoutIrys);
+    const payoutLabel = formatStakeAmount(payoutAmount);
     let resolvedBetKey = betKey;
     if (!resolvedBetKey) {
       const player = getDisplayWalletAddress();
@@ -116,13 +118,13 @@ function showBetOutcomeMessage({ asset, win, delta, pending, roundId, side, betK
 
     const instructions = document.createElement("small");
     instructions.className = "claim-hint";
-    instructions.textContent = "Click claim to fetch your reward signature and withdraw.";
+    instructions.textContent = `Claim ${payoutLabel} IRYS using the host signature.`;
     container.appendChild(instructions);
 
     const claimBtn = document.createElement("button");
     claimBtn.type = "button";
     claimBtn.className = "btn claim-btn";
-    claimBtn.textContent = "Claim reward";
+    claimBtn.textContent = `Claim ${payoutLabel} IRYS`;
     claimBtn.addEventListener("click", () => {
       initiateRewardClaim({
         card,
@@ -131,13 +133,13 @@ function showBetOutcomeMessage({ asset, win, delta, pending, roundId, side, betK
         side,
         betKey: resolvedBetKey,
         resultContainer: container,
-        suggestedPayoutIrys,
+        suggestedPayoutIrys: payoutAmount,
       });
     });
     container.appendChild(claimBtn);
 
     container.classList.add("visible", "win");
-    setCardStatus(card, `You won ${formatPoints(delta)}! Use the host signature to redeem your IRYS.`, "success");
+    setCardStatus(card, `You won ${formatPoints(delta)}! Claim ${payoutLabel} IRYS with the host signature.`, "success");
     return;
   }
 
@@ -167,13 +169,14 @@ let currentModalResults = null;
 let isRoundResultModalOpen = false;
 
 function buildRoundResultItemMarkup(result, index) {
-  const payoutLabel = formatStakeAmount(result.payoutIrys);
+  const payoutAmount = resolvePayoutIrys(result.payoutIrys);
+  const payoutLabel = result.win ? formatStakeAmount(payoutAmount) : "";
   const locked = typeof result.priceStart === "number" ? fmtUsd(result.priceStart, 4) : "$--";
   const settled = typeof result.priceEnd === "number" ? fmtUsd(result.priceEnd, 4) : "$--";
   const outcomeText = result.win
     ? `You won ${formatPoints(result.delta)}.`
     : `You lost ${formatPoints(result.delta)}.`;
-  const statusMessage = result.win ? "Reward ready to claim." : "Better luck next round.";
+  const statusMessage = result.win ? `Claim ${payoutLabel} IRYS now or later.` : "Better luck next round.";
   const roundLabel = typeof result.roundId === "bigint" ? Number(result.roundId) : result.roundId;
 
   return `
@@ -198,9 +201,27 @@ function showNextRoundResultModal() {
   if (!next) return;
   const modal = $("#roundResultModal");
   const body = $("#roundResultBody");
+  const title = $("#roundResultTitle");
+  const subtitle = $("#roundResultSubtitle");
   if (!modal || !body) return;
   currentModalResults = next;
   body.innerHTML = next.map((entry, idx) => buildRoundResultItemMarkup(entry, idx)).join("\n");
+
+  const winCount = next.filter((entry) => entry.win).length;
+  const lossCount = next.length - winCount;
+  if (title) {
+    if (winCount && !lossCount) title.textContent = winCount > 1 ? "You won this round!" : "You nailed it!";
+    else if (winCount && lossCount) title.textContent = "Round finished";
+    else title.textContent = lossCount > 1 ? "Round finished" : "Tough break";
+  }
+  if (subtitle) {
+    let summary = "Here are your outcomes for the last round.";
+    if (winCount && lossCount) summary = `Won ${winCount}, lost ${lossCount}. Claim rewards below.`;
+    else if (winCount) summary = winCount > 1 ? "Claim your rewards below." : "Claim your reward below.";
+    else if (lossCount) summary = lossCount > 1 ? "All your predictions missed this round." : "This prediction missed. Try again next round.";
+    subtitle.textContent = summary;
+  }
+
   isRoundResultModalOpen = true;
   modal.showModal();
 }
@@ -213,7 +234,7 @@ function enqueueRoundResults(results) {
     .filter((r) => (r.wallet || "").toLowerCase() === lower)
     .map((r) => ({
       ...r,
-      payoutIrys: resolvePayoutIrys(r.suggestedPayoutIrys),
+      payoutIrys: r.win ? resolvePayoutIrys(r.suggestedPayoutIrys) : null,
       claimed: Boolean(r.claimed),
     }));
   if (!mine.length) return;
@@ -500,7 +521,8 @@ const defaultAbiCoder = ethers.AbiCoder.defaultAbiCoder();
 
 function resolvePayoutIrys(value) {
   const num = Number(value);
-  return Number.isFinite(num) && num > 0 ? num : ENTRY_FEE_IRYS;
+  const fallback = ENTRY_FEE_IRYS * 2;
+  return Number.isFinite(num) && num > 0 ? num : fallback;
 }
 
 let rewardPoolDeploymentCheck = null;
@@ -701,7 +723,7 @@ async function initiateRewardClaim({ card, roundId, asset, side, betKey, resultC
     const numericHint = Number(suggestedPayoutIrys);
     const payoutDisplayIrys = Number.isFinite(numericHint) && numericHint > 0
       ? formatStakeAmount(numericHint)
-      : formatStakeAmount(ENTRY_FEE_IRYS);
+      : formatStakeAmount(ENTRY_FEE_IRYS * 2);
 
     const response = await fetch("/api/reward-signature", {
       method: "POST",
@@ -1350,6 +1372,11 @@ async function resolveOpenBets(){
       dayCount += 1;
       delta = Math.round(delta * dailyMultiplier(dayCount));
 
+      const stakeAmount = Number(b?.stake?.amountIrys ?? b?.stake?.amount);
+      const suggestedPayout = Number.isFinite(stakeAmount) && stakeAmount > 0
+        ? stakeAmount * 2
+        : ENTRY_FEE_IRYS * 2;
+
       const resultDetail = {
         wallet: addr,
         asset: b.asset,
@@ -1362,7 +1389,7 @@ async function resolveOpenBets(){
         resolvedTs,
         irysId: b.irysId || null,
         betKey: b.betKey || null,
-        suggestedPayoutIrys: b.stake?.amountIrys || null,
+        suggestedPayoutIrys: win ? suggestedPayout : null,
       };
       results.push(resultDetail);
 
